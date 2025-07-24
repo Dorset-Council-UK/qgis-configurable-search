@@ -1,0 +1,35 @@
+[general]
+name=Configurable Search
+qgisMinimumVersion=3.16
+description=A configurable search bar with interactive results list that searches through APIs and layers with customizable ordering and regex filtering
+version=1.1.0
+author=Dorset Council
+email=gis@dorsetcouncil.gov.uk
+
+about=This plugin adds a configurable search bar to the QGIS toolbar with an interactive results dropdown. Users can search through multiple APIs and project layers with customizable templates, ordering, and regex filtering. Features include: interactive results list with clickable items, API endpoint configuration with URL templates, search priority ordering, regex-based relevance filtering, project layer integration, visual search feedback, and configurable search stopping behavior.
+
+tracker=https://github.com/example/qgis-configurable-search/issues
+repository=https://github.com/example/qgis-configurable-search
+homepage=https://github.com/example/qgis-configurable-search
+
+# Uncomment the following line and add your changelog:
+# changelog=
+
+# Tags are comma separated with spaces allowed
+tags=search,api,toolbar,configuration,layers
+
+category=Plugins
+icon=icon.svg
+experimental=False
+deprecated=False
+
+# Since QGIS 3.8, a comma separated list of plugins to be installed
+# (or upgraded) can be specified.
+# Check the documentation for more information.
+# plugin_dependencies=
+
+Category of the plugin: Raster, Vector, Database or Web
+# category=
+
+# If the plugin can run on QGIS Server.
+server=False
