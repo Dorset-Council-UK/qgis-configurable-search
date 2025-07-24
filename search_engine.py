@@ -237,7 +237,11 @@ class SearchEngine(QObject):
             headers = provider.get("headers", {})
             method = provider.get("request_method", "GET").upper()
             timeout = self.config_manager.get_setting("search_timeout", 30)
-            
+            QgsMessageLog.logMessage(
+                    f"Making request to {url}", 
+                    "Configurable Search", 
+                    Qgis.Info
+                )
             if method == "GET":
                 response = requests.get(url, headers=headers, timeout=timeout)
             elif method == "POST":

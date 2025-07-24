@@ -536,6 +536,12 @@ class ProviderEditDialog(QDialog):
         self.url_label = QLabel("URL Template:")
         form_layout.addRow(self.url_label, self.url_edit)
         
+        # URL help text
+        self.url_help_label = QLabel("Use {search_term} as placeholder for the search query")
+        self.url_help_label.setStyleSheet("color: #666; font-style: italic; font-size: 11px;")
+        self.url_help_label.setWordWrap(True)
+        form_layout.addRow("", self.url_help_label)
+        
         # HTTP method
         self.method_combo = QComboBox()
         self.method_combo.addItems(["GET", "POST"])
@@ -631,6 +637,7 @@ class ProviderEditDialog(QDialog):
         api_visible = provider_type == "api"
         self.url_label.setVisible(api_visible)
         self.url_edit.setVisible(api_visible)
+        self.url_help_label.setVisible(api_visible)
         self.method_label.setVisible(api_visible)
         self.method_combo.setVisible(api_visible)
         self.headers_group.setVisible(api_visible)
