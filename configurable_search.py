@@ -3,7 +3,7 @@ import sys
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QThread, pyqtSignal, QTimer
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy, QDockWidget
-from qgis.core import QgsProject
+from qgis.core import QgsProject, QgsMessageLog, Qgis
 from qgis.gui import QgsGui
 
 # Initialize Qt resources from file resources.py
@@ -183,7 +183,7 @@ class ConfigurableSearch:
         self.dock_widget.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable | QDockWidget.DockWidgetClosable)
         
         # Add dock widget to QGIS interface
-        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock_widget)
+        self.iface.addDockWidget(Qt.LeftDockWidgetArea, self.dock_widget)
         
     def toggle_search_panel(self):
         """Toggle the visibility of the search panel."""
