@@ -2,7 +2,7 @@ import os
 import sys
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QThread, pyqtSignal, QTimer
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QToolBar, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame
+from qgis.PyQt.QtWidgets import QAction, QToolBar, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy
 from qgis.core import QgsProject
 from qgis.gui import QgsGui
 
@@ -29,7 +29,12 @@ class ConfigurableSearch:
         # initialize plugin directory
         self.plugin_dir = os.path.dirname(__file__)
         # initialize locale
-        locale = QSettings().value('locale/userLocale')[0:2]
+        locale_setting = QSettings().value('locale/userLocale', 'en')
+        # Convert QVariant to string and get first 2 characters, fallback to 'en'
+        if locale_setting:
+            locale = str(locale_setting)[:2]
+        else:
+            locale = 'en'
         locale_path = os.path.join(
             self.plugin_dir,
             'i18n',
@@ -210,6 +215,10 @@ class SearchWidget(QWidget):
         self.config_manager = config_manager
         self.iface = iface
         self.current_results = []
+        
+        # Set size policy to prevent unnecessary expansion
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        
         self.setup_ui()
         self.connect_signals()
         
@@ -219,6 +228,7 @@ class SearchWidget(QWidget):
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(5, 2, 5, 2)
         main_layout.setSpacing(0)
+        main_layout.setAlignment(Qt.AlignTop)  # Align contents to top
         
         # Search box layout
         search_layout = QHBoxLayout()
@@ -232,6 +242,7 @@ class SearchWidget(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Enter search term...")
         self.search_input.setMinimumWidth(250)
+        self.search_input.setMaximumHeight(25)  # Limit height to prevent expansion
         self.search_input.returnPressed.connect(self.perform_search)
         search_layout.addWidget(self.search_input)
         
@@ -276,6 +287,9 @@ class SearchWidget(QWidget):
         
         self.results_frame.setLayout(results_layout)
         main_layout.addWidget(self.results_frame)
+        
+        # Add stretch to push everything to the top
+        main_layout.addStretch()
         
         self.setLayout(main_layout)
         
@@ -400,10 +414,22 @@ class SearchWidget(QWidget):
             
             if "bbox" in result:
                 # Use bounding box if available
+                # Nominatim bbox format: [south, north, west, east] in WGS84
                 bbox = result["bbox"]
                 if len(bbox) >= 4:
-                    from qgis.core import QgsRectangle
+                    from qgis.core import QgsRectangle, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
+                    
+                    # Create rectangle from bbox: [south, north, west, east] -> [west, south, east, north]
                     rect = QgsRectangle(float(bbox[2]), float(bbox[0]), float(bbox[3]), float(bbox[1]))
+                    
+                    # Transform bbox if needed (Nominatim returns WGS84)
+                    source_crs = QgsCoordinateReferenceSystem("EPSG:4326")
+                    dest_crs = canvas.mapSettings().destinationCrs()
+                    
+                    if source_crs != dest_crs:
+                        transform = QgsCoordinateTransform(source_crs, dest_crs, QgsProject.instance())
+                        rect = transform.transformBoundingBox(rect)
+                    
                     canvas.setExtent(rect)
                     canvas.refresh()
                     return

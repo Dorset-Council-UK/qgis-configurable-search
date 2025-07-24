@@ -8,7 +8,8 @@ from qgis.PyQt.QtWidgets import (
     QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QDoubleSpinBox
 )
 from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem
-from qgis.core import QgsProject, QgsVectorLayer
+from qgis.core import QgsProject, QgsVectorLayer, QgsApplication
+from qgis.gui import QgsAuthConfigSelect
 
 
 class ConfigurableSearchDialog(QDialog):
@@ -552,12 +553,29 @@ class ProviderEditDialog(QDialog):
         layout.addLayout(form_layout)
         
         # Headers section (for API providers)
-        self.headers_group = QGroupBox("HTTP Headers")
+        self.headers_group = QGroupBox("HTTP Headers & Authentication")
         headers_layout = QVBoxLayout()
+        
+        # Authentication configuration
+        auth_layout = QFormLayout()
+        self.auth_config_select = QgsAuthConfigSelect()
+        self.auth_config_select.setToolTip("Select a QGIS authentication configuration to use for this API")
+        auth_layout.addRow("Authentication Config:", self.auth_config_select)
+        
+        auth_info_label = QLabel("Note: Authentication config will override manual headers for authentication")
+        auth_info_label.setStyleSheet("color: #666; font-style: italic;")
+        auth_layout.addRow(auth_info_label)
+        
+        headers_layout.addLayout(auth_layout)
+        
+        # Manual headers
+        manual_headers_label = QLabel("Manual Headers (optional):")
+        manual_headers_label.setStyleSheet("font-weight: bold;")
+        headers_layout.addWidget(manual_headers_label)
         
         self.headers_edit = QTextEdit()
         self.headers_edit.setMaximumHeight(100)
-        self.headers_edit.setPlaceholderText("Enter headers as JSON, e.g.:\n{\"Authorization\": \"Bearer token\"}")
+        self.headers_edit.setPlaceholderText("Enter headers as JSON, e.g.:\n{\"Authorization\": \"Bearer token\", \"Content-Type\": \"application/json\"}")
         headers_layout.addWidget(self.headers_edit)
         
         self.headers_group.setLayout(headers_layout)
@@ -642,6 +660,10 @@ class ProviderEditDialog(QDialog):
             import json
             self.headers_edit.setPlainText(json.dumps(headers, indent=2))
             
+        # Load authentication configuration
+        auth_config_id = self.provider.get("auth_config_id", "")
+        self.auth_config_select.setConfigId(auth_config_id)
+            
         # Load parser settings
         parser = self.provider.get("result_parser", {})
         self.name_field_edit.setText(parser.get("name_field", ""))
@@ -660,6 +682,7 @@ class ProviderEditDialog(QDialog):
             "regex_filter": self.regex_edit.text(),
             "stop_on_result": self.stop_checkbox.isChecked(),
             "headers": {},
+            "auth_config_id": self.auth_config_select.configId(),
             "result_parser": {}
         }
         

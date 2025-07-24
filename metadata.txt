@@ -1,19 +1,25 @@
 [general]
 name=Configurable Search
 qgisMinimumVersion=3.16
-description=A configurable search bar with interactive results list that searches through APIs and layers with customizable ordering and regex filtering
-version=1.1.0
+description=A configurable search bar with interactive results list that searches through APIs and layers. Features QGIS Authentication support, customizable ordering, and regex filtering
+version=1.2.3
 author=Dorset Council
 email=gis@dorsetcouncil.gov.uk
 
-about=This plugin adds a configurable search bar to the QGIS toolbar with an interactive results dropdown. Users can search through multiple APIs and project layers with customizable templates, ordering, and regex filtering. Features include: interactive results list with clickable items, API endpoint configuration with URL templates, search priority ordering, regex-based relevance filtering, project layer integration, visual search feedback, and configurable search stopping behavior.
+about=This plugin adds a configurable search bar to the QGIS toolbar with an interactive results dropdown. Users can search through multiple APIs and project layers with customizable templates, ordering, and regex filtering. Features include: interactive results list with clickable items, API endpoint configuration with URL templates, QGIS Authentication Configuration support for secure API access, search priority ordering, regex-based relevance filtering, project layer integration, visual search feedback, persistent results display, loading indicators, smart zoom levels, and configurable search stopping behavior.
 
 tracker=https://github.com/example/qgis-configurable-search/issues
 repository=https://github.com/example/qgis-configurable-search
 homepage=https://github.com/example/qgis-configurable-search
 
 # Uncomment the following line and add your changelog:
-# changelog=
+changelog=
+    1.2.3 - Fixed coordinate transformation for Nominatim search results in projected CRS
+    1.2.2 - Improved UI alignment: search widget and results now align to top of panel
+    1.2.1 - Fixed QVariant subscripting error in locale initialization
+    1.2.0 - Added QGIS Authentication Configuration support for secure API access
+    1.1.0 - Added loading indicators, persistent results display, and smart zoom levels
+    1.0.0 - Initial release with configurable search, API providers, and interactive results
 
 # Tags are comma separated with spaces allowed
 tags=search,api,toolbar,configuration,layers

@@ -5,9 +5,11 @@ from qgis.PyQt.QtCore import QThread, pyqtSignal, QObject
 from qgis.core import (
     QgsProject, QgsVectorLayer, QgsFeatureRequest, QgsGeometry, 
     QgsPointXY, QgsCoordinateReferenceSystem, QgsCoordinateTransform,
-    QgsRectangle, QgsMessageLog, Qgis
+    QgsRectangle, QgsMessageLog, Qgis, QgsApplication, QgsNetworkAccessManager
 )
 from qgis.gui import QgsMapCanvas
+from qgis.PyQt.QtNetwork import QNetworkRequest, QNetworkReply
+from qgis.PyQt.QtCore import QUrl, QEventLoop
 
 
 class SearchEngine(QObject):
@@ -135,6 +137,102 @@ class SearchEngine(QObject):
         url = url_template.replace("{search_term}", requests.utils.quote(search_term))
         
         try:
+            # Check if authentication configuration is specified
+            auth_config_id = provider.get("auth_config_id", "")
+            
+            if auth_config_id:
+                # Use QGIS authentication system
+                response_data = self._make_authenticated_request(url, provider, auth_config_id)
+            else:
+                # Use regular requests with manual headers
+                response_data = self._make_regular_request(url, provider)
+                
+            if response_data:
+                return self._parse_api_results(response_data, provider, search_term)
+                
+        except Exception as e:
+            QgsMessageLog.logMessage(
+                f"Error parsing response from {provider.get('name', 'API')}: {str(e)}", 
+                "Configurable Search", 
+                Qgis.Warning
+            )
+            
+        return []
+        
+    def _make_authenticated_request(self, url, provider, auth_config_id):
+        """Make an authenticated request using QGIS authentication system."""
+        try:
+            # Get QGIS network access manager
+            nam = QgsNetworkAccessManager.instance()
+            
+            # Create network request
+            request = QNetworkRequest(QUrl(url))
+            
+            # Apply authentication
+            auth_manager = QgsApplication.authManager()
+            if not auth_manager.updateNetworkRequest(request, auth_config_id):
+                QgsMessageLog.logMessage(
+                    f"Failed to apply authentication config {auth_config_id}", 
+                    "Configurable Search", 
+                    Qgis.Warning
+                )
+                return None
+            
+            # Add manual headers if any (they will be merged with auth headers)
+            manual_headers = provider.get("headers", {})
+            for key, value in manual_headers.items():
+                request.setRawHeader(key.encode(), str(value).encode())
+            
+            # Set timeout
+            timeout = self.config_manager.get_setting("search_timeout", 30) * 1000  # Convert to ms
+            
+            # Make request based on method
+            method = provider.get("request_method", "GET").upper()
+            if method == "GET":
+                reply = nam.get(request)
+            elif method == "POST":
+                reply = nam.post(request, b"")  # Empty POST data for now
+            else:
+                QgsMessageLog.logMessage(
+                    f"Unsupported HTTP method for authenticated requests: {method}", 
+                    "Configurable Search", 
+                    Qgis.Warning
+                )
+                return None
+            
+            # Wait for response
+            loop = QEventLoop()
+            reply.finished.connect(loop.quit)
+            loop.exec_()
+            
+            # Check for errors
+            if reply.error() != QNetworkReply.NoError:
+                QgsMessageLog.logMessage(
+                    f"Network error for {provider.get('name', 'API')}: {reply.errorString()}", 
+                    "Configurable Search", 
+                    Qgis.Warning
+                )
+                reply.deleteLater()
+                return None
+            
+            # Read response
+            response_data = reply.readAll().data().decode('utf-8')
+            reply.deleteLater()
+            
+            # Parse JSON response
+            return json.loads(response_data)
+            
+        except Exception as e:
+            QgsMessageLog.logMessage(
+                f"Error in authenticated request for {provider.get('name', 'API')}: {str(e)}", 
+                "Configurable Search", 
+                Qgis.Warning
+            )
+            return None
+    
+    def _make_regular_request(self, url, provider):
+        """Make a regular request using the requests library."""
+        try:
             # Make request
             headers = provider.get("headers", {})
             method = provider.get("request_method", "GET").upper()
@@ -150,20 +248,20 @@ class SearchEngine(QObject):
                     "Configurable Search", 
                     Qgis.Warning
                 )
-                return []
+                return None
                 
             response.raise_for_status()
             
             # Parse response
             if response.headers.get('content-type', '').startswith('application/json'):
-                data = response.json()
-                return self._parse_api_results(data, provider, search_term)
+                return response.json()
             else:
                 QgsMessageLog.logMessage(
                     f"Non-JSON response from {provider.get('name', 'API')}", 
                     "Configurable Search", 
                     Qgis.Warning
                 )
+                return None
                 
         except requests.RequestException as e:
             QgsMessageLog.logMessage(
@@ -171,14 +269,7 @@ class SearchEngine(QObject):
                 "Configurable Search", 
                 Qgis.Warning
             )
-        except Exception as e:
-            QgsMessageLog.logMessage(
-                f"Error parsing response from {provider.get('name', 'API')}: {str(e)}", 
-                "Configurable Search", 
-                Qgis.Warning
-            )
-            
-        return []
+            return None
         
     def _parse_api_results(self, data, provider, search_term):
         """Parse API results based on provider configuration."""
@@ -395,6 +486,15 @@ class SearchEngine(QObject):
                 bbox = result["bbox"]
                 if len(bbox) >= 4:
                     rect = QgsRectangle(float(bbox[2]), float(bbox[0]), float(bbox[3]), float(bbox[1]))
+                    
+                    # Transform bbox if needed
+                    source_crs = QgsCoordinateReferenceSystem("EPSG:4326")
+                    dest_crs = canvas.mapSettings().destinationCrs()
+                    
+                    if source_crs != dest_crs:
+                        transform = QgsCoordinateTransform(source_crs, dest_crs, QgsProject.instance())
+                        rect = transform.transformBoundingBox(rect)
+                    
                     canvas.setExtent(rect)
                     canvas.refresh()
                     return

@@ -15,8 +15,9 @@ A modern QGIS plugin that adds a powerful configurable search bar to the QGIS to
 
 ### ⚙️ **Advanced Configuration**
 - **API Providers**: Add custom API endpoints with URL templates
+- **QGIS Authentication**: Use QGIS authentication configurations for secure API access
 - **Regex Filtering**: Use regular expressions to determine search relevance
-- **Custom Headers**: Support for authentication and custom HTTP headers
+- **Custom Headers**: Support for manual headers alongside authentication
 - **Result Parsing**: Configure how to extract location data from API responses
 - **Search Behavior**: Control search stopping, timeouts, and result limits
 - **Smart Zoom Levels**: Automatic zoom detection based on coordinate system (geographic vs projected)
@@ -97,6 +98,36 @@ The plugin automatically detects your map's coordinate reference system (CRS) an
 - **Name**: My Geocoder
 - **Type**: API
 - **URL Template**: `https://api.example.com/geocode?query={search_term}&key=YOUR_API_KEY`
+
+### Using QGIS Authentication
+
+The plugin supports QGIS Authentication Configurations for secure API access, which is the recommended approach for APIs requiring authentication.
+
+#### Setting up Authentication:
+
+1. **Create Authentication Configuration**:
+   - Go to `Settings > Options > Authentication` in QGIS
+   - Click `+` to add a new configuration
+   - Choose the appropriate authentication method (Basic, OAuth2, API Key, etc.)
+   - Configure your credentials and save with a meaningful name
+
+2. **Configure API Provider with Authentication**:
+   - In the plugin's API Providers tab, add or edit a provider
+   - In the "HTTP Headers & Authentication" section:
+     - Select your authentication configuration from the dropdown
+     - Optionally add manual headers that will be merged with auth headers
+   - The authentication will be applied automatically to all requests
+
+#### Benefits of QGIS Authentication:
+- **Secure**: Credentials are encrypted and stored securely by QGIS
+- **Reusable**: Same auth config can be used across multiple plugins and data sources
+- **Flexible**: Supports various authentication methods (Basic, Bearer tokens, OAuth2, etc.)
+- **No hardcoding**: Avoid putting sensitive credentials in configuration files
+
+#### Manual Headers vs Authentication:
+- **Authentication Config**: Recommended for credentials and sensitive headers
+- **Manual Headers**: Use for non-sensitive headers like `Content-Type`, `User-Agent`, etc.
+- **Combined**: You can use both - auth config for credentials, manual headers for other needs
 - **Headers**: `{"Authorization": "Bearer YOUR_TOKEN"}`
 - **Result Parser**:
   - Name Field: `results.0.formatted_address`
