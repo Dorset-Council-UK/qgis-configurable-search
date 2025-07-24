@@ -1,6 +1,6 @@
 # Configurable Search QGIS Plugin
 
-A modern QGIS plugin that adds a powerful configurable search bar to the QGIS toolbar. This plugin allows users to search through multiple APIs and project layers with customizable templates, ordering, and regex filtering.
+A modern QGIS plugin that adds a powerful configurable search panel to QGIS. This plugin provides a dockable search interface that allows users to search through multiple APIs and project layers with customizable templates, ordering, and regex filtering.
 
 ## Features
 
@@ -51,12 +51,13 @@ A modern QGIS plugin that adds a powerful configurable search bar to the QGIS to
 ## Usage
 
 ### Basic Search
-1. After installation, you'll see a search bar in the QGIS toolbar
-2. Type your search term and press Enter
-3. A loading indicator will appear showing search progress
-4. A dropdown list will appear showing all matching results
-5. Click on any result to zoom to that location
-6. Results remain visible for easy exploration of multiple locations
+1. After installation, you'll see a search panel that can be docked anywhere in QGIS
+2. Use the "Toggle Search Panel" toolbar button to show/hide the panel
+3. Type your search term and press Enter
+4. A loading indicator will appear showing search progress
+5. A dropdown list will appear showing all matching results
+6. Click on any result to zoom to that location
+7. Results remain visible for easy exploration of multiple locations
 4. Click any result in the list to zoom directly to that location
 5. Close the results list using the "✕ Close" link or start a new search
 

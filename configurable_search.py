@@ -2,7 +2,7 @@ import os
 import sys
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QThread, pyqtSignal, QTimer
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QToolBar, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy
+from qgis.PyQt.QtWidgets import QAction, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy, QDockWidget
 from qgis.core import QgsProject
 from qgis.gui import QgsGui
 
@@ -147,27 +147,51 @@ class ConfigurableSearch:
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
         icon_path = os.path.join(self.plugin_dir, 'icon.svg')
+        
+        # Add configuration action
         self.add_action(
             icon_path,
             text=self.tr(u'Configure Search'),
             callback=self.show_config_dialog,
             parent=self.iface.mainWindow())
+        
+        # Add toggle panel action
+        self.add_action(
+            icon_path,
+            text=self.tr(u'Toggle Search Panel'),
+            callback=self.toggle_search_panel,
+            parent=self.iface.mainWindow())
 
-        # Create search widget for toolbar
+        # Create search dock widget
         self.create_search_widget()
         
         # will be set False in run()
         self.first_start = True
 
     def create_search_widget(self):
-        """Create the search widget for the toolbar."""
-        # Create a custom toolbar for the search widget
-        self.toolbar = self.iface.addToolBar("Configurable Search")
-        self.toolbar.setObjectName("ConfigurableSearchToolbar")
-        
+        """Create the search dock widget panel."""
         # Create search widget
         self.search_widget = SearchWidget(self.search_engine, self.config_manager, self.iface)
-        self.toolbar.addWidget(self.search_widget)
+        
+        # Create dock widget
+        self.dock_widget = QDockWidget("Configurable Search", self.iface.mainWindow())
+        self.dock_widget.setObjectName("ConfigurableSearchDock")
+        self.dock_widget.setWidget(self.search_widget)
+        
+        # Set dock widget properties
+        self.dock_widget.setAllowedAreas(Qt.LeftDockWidgetArea | Qt.RightDockWidgetArea | Qt.TopDockWidgetArea | Qt.BottomDockWidgetArea)
+        self.dock_widget.setFeatures(QDockWidget.DockWidgetMovable | QDockWidget.DockWidgetFloatable | QDockWidget.DockWidgetClosable)
+        
+        # Add dock widget to QGIS interface
+        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.dock_widget)
+        
+    def toggle_search_panel(self):
+        """Toggle the visibility of the search panel."""
+        if hasattr(self, 'dock_widget') and self.dock_widget:
+            if self.dock_widget.isVisible():
+                self.dock_widget.hide()
+            else:
+                self.dock_widget.show()
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -177,9 +201,10 @@ class ConfigurableSearch:
                 action)
             self.iface.removeToolBarIcon(action)
         
-        # Remove the toolbar
-        if self.toolbar:
-            self.iface.mainWindow().removeToolBar(self.toolbar)
+        # Remove the dock widget
+        if hasattr(self, 'dock_widget') and self.dock_widget:
+            self.iface.removeDockWidget(self.dock_widget)
+            self.dock_widget = None
 
     def show_config_dialog(self):
         """Show the configuration dialog."""
@@ -216,23 +241,28 @@ class SearchWidget(QWidget):
         self.iface = iface
         self.current_results = []
         
-        # Set size policy to prevent unnecessary expansion
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        # Set size policy for panel (allow expansion)
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
         
         self.setup_ui()
         self.connect_signals()
         
     def setup_ui(self):
-        """Setup the UI components."""
+        """Setup the UI components for panel layout."""
         # Main layout - vertical to stack search box and results
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(5, 2, 5, 2)
-        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(10, 10, 10, 10)  # More padding for panel
+        main_layout.setSpacing(5)
         main_layout.setAlignment(Qt.AlignTop)  # Align contents to top
         
         # Search box layout
         search_layout = QHBoxLayout()
         search_layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Panel title/header
+        panel_title = QLabel("🔍 Configurable Search")
+        panel_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #333; margin-bottom: 5px;")
+        main_layout.addWidget(panel_title)
         
         # Search label
         self.label = QLabel("Search:")
@@ -241,8 +271,7 @@ class SearchWidget(QWidget):
         # Search input
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Enter search term...")
-        self.search_input.setMinimumWidth(250)
-        self.search_input.setMaximumHeight(25)  # Limit height to prevent expansion
+        self.search_input.setMinimumWidth(200)  # Reduced min width for panel
         self.search_input.returnPressed.connect(self.perform_search)
         search_layout.addWidget(self.search_input)
         
@@ -271,8 +300,7 @@ class SearchWidget(QWidget):
         
         # Results list
         self.results_list = QListWidget()
-        self.results_list.setMaximumHeight(200)
-        self.results_list.setMinimumHeight(50)
+        self.results_list.setMinimumHeight(100)  # Minimum height for panel
         self.results_list.itemClicked.connect(self.on_result_clicked)
         results_layout.addWidget(self.results_list)
         
