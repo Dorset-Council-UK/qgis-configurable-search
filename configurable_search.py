@@ -275,14 +275,14 @@ class SearchWidget(QWidget):
         self.search_input.returnPressed.connect(self.perform_search)
         search_layout.addWidget(self.search_input)
         
-        # Loading indicator (initially hidden)
-        self.loading_label = QLabel("🔍 Searching...")
-        self.loading_label.setStyleSheet("QLabel { color: #666; font-style: italic; }")
-        self.loading_label.hide()
-        search_layout.addWidget(self.loading_label)
-        
         # Add search layout to main layout
         main_layout.addLayout(search_layout)
+        
+        # Loading indicator underneath search box (initially hidden)
+        self.loading_label = QLabel("🔍 Searching...")
+        self.loading_label.setStyleSheet("QLabel { color: #666; font-style: italic; margin-left: 10px; margin-top: 2px; }")
+        self.loading_label.hide()
+        main_layout.addWidget(self.loading_label)
         
         # Results list (initially hidden)
         self.results_frame = QFrame()
