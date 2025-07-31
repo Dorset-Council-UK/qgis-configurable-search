@@ -326,6 +326,7 @@ class SearchWidget(QWidget):
         self.search_engine.search_completed.connect(self.on_search_completed)
         self.search_engine.search_started.connect(self.on_search_started)
         self.search_engine.search_error.connect(self.on_search_error)
+        self.search_engine.provider_search_started.connect(self.on_provider_search_started)
         
     def perform_search(self):
         """Perform search when Enter is pressed."""
@@ -341,6 +342,11 @@ class SearchWidget(QWidget):
         self.loading_label.setText(f"🔍 Searching for '{search_term}'...")
         self.loading_label.show()
         self.hide_results()
+        
+    def on_provider_search_started(self, provider_name, search_term):
+        """Handle individual provider search started."""
+        self.loading_label.setText(f"🔍 Searching {provider_name} for '{search_term}'...")
+        self.loading_label.show()
         
     def on_search_completed(self, results):
         """Handle search completion and show results."""

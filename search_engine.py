@@ -2,6 +2,7 @@ import re
 import json
 import requests
 from qgis.PyQt.QtCore import QThread, pyqtSignal, QObject, QVariant
+from qgis.PyQt.QtWidgets import QApplication
 from qgis.core import (
     QgsProject, QgsVectorLayer, QgsFeatureRequest, QgsGeometry, 
     QgsPointXY, QgsCoordinateReferenceSystem, QgsCoordinateTransform,
@@ -20,6 +21,7 @@ class SearchEngine(QObject):
     search_started = pyqtSignal(str)
     search_completed = pyqtSignal(list)
     search_error = pyqtSignal(str)
+    provider_search_started = pyqtSignal(str, str)  # provider_name, search_term
     
     def __init__(self, config_manager):
         super().__init__()
@@ -36,7 +38,12 @@ class SearchEngine(QObject):
         if not search_term.strip():
             return
             
+        print(f"DEBUG: Starting search for term: {search_term}")
         self.search_started.emit(search_term)
+        
+        # Force UI update to show loading message before starting search
+        from qgis.PyQt.QtWidgets import QApplication
+        QApplication.processEvents()
         
         # Get configuration
         providers = self.config_manager.get_search_providers()
@@ -49,12 +56,23 @@ class SearchEngine(QObject):
         results = []
         search_stopped = False
         
+        print(f"DEBUG: Found {len(providers)} enabled providers")
+        
         # Search through providers in priority order
         # Two ways to stop searching:
         # 1. Individual provider has "stop_on_result" enabled and returns results
         # 2. Global "stop_on_first_result" setting is enabled and any provider returns results
         for provider in providers:
+            provider_name = provider.get("name", "Unknown")
+            print(f"DEBUG: Starting search for provider: {provider_name}")
+            
+            # Emit provider-specific signal
+            self.provider_search_started.emit(provider_name, search_term)
+            QApplication.processEvents()
+            
             provider_results = self._search_provider(provider, search_term, iface)
+            print(f"DEBUG: Provider {provider_name} returned {len(provider_results) if provider_results else 0} results")
+            
             if provider_results:
                 results.extend(provider_results)
                 # Stop if this provider has "stop on result" enabled and returned results
@@ -67,6 +85,7 @@ class SearchEngine(QObject):
                     break
             
         # Process results
+        print(f"DEBUG: Processing {len(results)} total results")
         self._process_results(results, iface)
         self.search_completed.emit(results)
         
@@ -409,16 +428,22 @@ class SearchEngine(QObject):
         results = []
         max_features = 50  # Default max features
         
+        print(f"DEBUG: Starting layer search in {layer.name()}")
         QgsMessageLog.logMessage(
             f"Searching layer {layer.name()} with optimized expression", 
             "Configurable Search", 
             Qgis.Info
         )
         
+        # Force UI update to ensure loading message is visible
+        QApplication.processEvents()
+        
         try:
             # Get search configuration from provider
             search_fields = provider.get("search_fields", "").strip()
             search_mode = provider.get("search_mode", "wildcard")
+            
+            print(f"DEBUG: Search fields: {search_fields}, Search mode: {search_mode}")
             
             # Determine which fields to search
             if search_fields:
@@ -441,6 +466,8 @@ class SearchEngine(QObject):
                     Qgis.Warning
                 )
                 return results
+            
+            print(f"DEBUG: Searching fields: {field_names}")
             
             # Build search expression based on mode
             expression_parts = []
@@ -521,10 +548,13 @@ class SearchEngine(QObject):
                     "Configurable Search", 
                     Qgis.Info
                 )
+                print(f"DEBUG: Layer search completed, returning {count} results")
                 
         except Exception as e:
+            error_msg = f"Error searching features in layer {layer.name()}: {str(e)}"
+            print(f"DEBUG: Layer search error: {error_msg}")
             QgsMessageLog.logMessage(
-                f"Error searching features in layer {layer.name()}: {str(e)}", 
+                error_msg, 
                 "Configurable Search", 
                 Qgis.Warning
             )
