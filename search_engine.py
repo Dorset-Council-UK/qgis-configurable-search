@@ -101,7 +101,7 @@ class SearchEngine(QObject):
                     return []
                     
             if provider_type == "coordinate":
-                return self._search_coordinates(search_term, provider)
+                return self._search_coordinates(search_term, provider, iface)
             elif provider_type == "api":
                 return self._search_api(provider, search_term)
             elif provider_type == "layer":
@@ -116,8 +116,79 @@ class SearchEngine(QObject):
             
         return []
         
-    def _search_coordinates(self, search_term, provider):
-        """Search for coordinates in the search term."""
+    def _search_coordinates(self, search_term, provider, iface=None):
+        """Enhanced coordinate search supporting current map CRS and multiple formats."""
+        if not iface:
+            # Fallback to simple lat/lon parsing if no iface provided
+            return self._search_coordinates_simple(search_term, provider)
+        
+        canvas = iface.mapCanvas()
+        current_crs = canvas.mapSettings().destinationCrs()
+        
+        # Parse coordinates from the search term
+        coords = self._parse_coordinates(search_term)
+        if not coords:
+            return []
+        
+        x, y = coords
+        
+        # Detect the coordinate system based on values and current map CRS
+        source_crs = self._detect_coordinate_system(x, y, current_crs, search_term)
+        if not source_crs or not source_crs.isValid():
+            return []
+        
+        # Transform to map CRS if needed
+        if source_crs != current_crs:
+            transform = QgsCoordinateTransform(source_crs, current_crs, QgsProject.instance())
+            try:
+                map_point = transform.transform(QgsPointXY(x, y))
+                map_x, map_y = map_point.x(), map_point.y()
+            except Exception as e:
+                QgsMessageLog.logMessage(
+                    f"Coordinate transformation failed: {str(e)}", 
+                    "Configurable Search", 
+                    Qgis.Warning
+                )
+                return []
+        else:
+            map_x, map_y = x, y
+        
+        # Create result with appropriate display format
+        if source_crs.isGeographic():
+            # For geographic coordinates, show as lat, lon
+            display_coords = f"{y:.6f}, {x:.6f}"
+            coord_type = "Geographic"
+        else:
+            # For projected coordinates, show as x, y
+            display_coords = f"{x:.2f}, {y:.2f}"
+            coord_type = "Projected"
+        
+        # Get CRS description
+        crs_desc = source_crs.description() or source_crs.authid()
+        
+        return [{
+            "name": f"{coord_type}: {display_coords} ({crs_desc})",
+            "provider": provider.get("name", "Coordinate Search"),
+            "type": "coordinate",
+            "geometry": {
+                "x": map_x,
+                "y": map_y,
+                "crs": current_crs.authid()
+            },
+            "data": {
+                "original_x": x,
+                "original_y": y,
+                "original_crs": source_crs.authid(),
+                "map_x": map_x,
+                "map_y": map_y,
+                "map_crs": current_crs.authid(),
+                "search_term": search_term,
+                "source_crs_description": crs_desc
+            }
+        }]
+    
+    def _search_coordinates_simple(self, search_term, provider):
+        """Simple coordinate search for lat/lon (fallback method)."""
         # Match coordinate patterns like: "lat, lon" or "lat,lon"
         coord_pattern = r'^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$'
         match = re.match(coord_pattern, search_term.strip())
@@ -138,8 +209,74 @@ class SearchEngine(QObject):
                     "search_term": search_term
                 }
             }]
-            
         return []
+    
+    def _parse_coordinates(self, coord_text):
+        """Parse coordinates from various formats and separators."""
+        # Remove any extra whitespace and handle explicit CRS specification
+        clean_text = coord_text.strip()
+        
+        # Check for explicit CRS specification: "EPSG:3857: 583960, 4507523"
+        crs_pattern = r'^(EPSG:\d+|CRS:\d+)\s*:\s*(.+)$'
+        match = re.match(crs_pattern, clean_text, re.IGNORECASE)
+        if match:
+            # Extract coordinates part only, store CRS info for later use
+            clean_text = match.group(2).strip()
+            self._explicit_crs = match.group(1).upper()
+        else:
+            self._explicit_crs = None
+        
+        # Try different separators: comma, space, tab, semicolon
+        separators = [',', ' ', '\t', ';']
+        
+        for sep in separators:
+            if sep in clean_text:
+                parts = [p.strip() for p in clean_text.split(sep) if p.strip()]
+                if len(parts) == 2:
+                    try:
+                        x = float(parts[0])
+                        y = float(parts[1])
+                        return x, y
+                    except ValueError:
+                        continue
+        
+        # Try space-separated without explicit separator
+        parts = clean_text.split()
+        if len(parts) == 2:
+            try:
+                x = float(parts[0])
+                y = float(parts[1])
+                return x, y
+            except ValueError:
+                pass
+        
+        return None
+    
+    def _detect_coordinate_system(self, x, y, current_crs, search_term):
+        """Detect what coordinate system the input coordinates are in."""
+        # Check if CRS was explicitly specified
+        if hasattr(self, '_explicit_crs') and self._explicit_crs:
+            return QgsCoordinateReferenceSystem(self._explicit_crs)
+        
+        # Auto-detect based on coordinate values and current CRS
+        
+        # If current CRS is geographic and values look like lat/lon
+        if current_crs.isGeographic():
+            if -180 <= x <= 180 and -90 <= y <= 90:
+                return current_crs
+        
+        # If current CRS is projected and values are large (not lat/lon)
+        elif not current_crs.isGeographic():
+            if abs(x) > 180 or abs(y) > 90:  # Too large for lat/lon
+                return current_crs
+        
+        # Fallback: assume WGS84 if it looks like lat/lon
+        if -180 <= x <= 180 and -90 <= y <= 90:
+            return QgsCoordinateReferenceSystem("EPSG:4326")
+        
+        # If coordinates are too large for lat/lon but current CRS is geographic,
+        # we can't auto-detect - return None to indicate failure
+        return None
         
     def _search_api(self, provider, search_term):
         """Search using an API provider."""
@@ -666,8 +803,40 @@ class SearchEngine(QObject):
                     canvas.refresh()
                     return
                     
-            if "geometry" in result and "lat" in result["geometry"] and "lon" in result["geometry"]:
-                # Use point coordinates
+            # Handle enhanced coordinate results (new format with x, y, crs)
+            if "geometry" in result and "x" in result["geometry"] and "y" in result["geometry"]:
+                # Use enhanced coordinate format
+                x = float(result["geometry"]["x"])
+                y = float(result["geometry"]["y"])
+                crs_id = result["geometry"].get("crs")
+                
+                point = QgsPointXY(x, y)
+                
+                # If CRS is specified and different from current, transform
+                if crs_id:
+                    source_crs = QgsCoordinateReferenceSystem(crs_id)
+                    dest_crs = canvas.mapSettings().destinationCrs()
+                    
+                    if source_crs != dest_crs:
+                        transform = QgsCoordinateTransform(source_crs, dest_crs, QgsProject.instance())
+                        point = transform.transform(point)
+                
+                # Create an appropriate extent based on CRS type
+                dest_crs = canvas.mapSettings().destinationCrs()
+                if dest_crs.isGeographic():
+                    # For geographic CRS (degrees), use configurable buffer
+                    buffer = self.config_manager.get_setting("zoom_buffer_geographic", 0.001)
+                else:
+                    # For projected CRS (meters/feet), use configurable buffer
+                    buffer = self.config_manager.get_setting("zoom_buffer_projected", 500)
+                    
+                extent = QgsRectangle(point.x() - buffer, point.y() - buffer, point.x() + buffer, point.y() + buffer)
+                canvas.setExtent(extent)
+                canvas.refresh()
+                return
+                    
+            elif "geometry" in result and "lat" in result["geometry"] and "lon" in result["geometry"]:
+                # Use legacy point coordinates (lat/lon format)
                 lat = float(result["geometry"]["lat"])
                 lon = float(result["geometry"]["lon"])
                 

@@ -450,6 +450,8 @@ class SearchWidget(QWidget):
             
             # Optionally, you could add a flash effect or change the item style
             # For now, just keep the selection to show which item was clicked
+        else:
+            print(f"DEBUG: Invalid result index or no current results")
             
     def zoom_to_result(self, result):
         """Zoom to a specific search result."""
@@ -478,8 +480,41 @@ class SearchWidget(QWidget):
                     
             if "geometry" in result:
                 geometry = result["geometry"]
-                if isinstance(geometry, dict) and "lat" in geometry and "lon" in geometry:
-                    # Use point coordinates from API results
+                
+                # Handle enhanced coordinate results (new format with x, y, crs)
+                if isinstance(geometry, dict) and "x" in geometry and "y" in geometry:
+                    # Use enhanced coordinate format
+                    x = float(geometry["x"])
+                    y = float(geometry["y"])
+                    crs_id = geometry.get("crs")
+                    
+                    point = QgsPointXY(x, y)
+                    
+                    # If CRS is specified and different from current, transform
+                    if crs_id:
+                        source_crs = QgsCoordinateReferenceSystem(crs_id)
+                        dest_crs = canvas.mapSettings().destinationCrs()
+                        
+                        if source_crs != dest_crs:
+                            transform = QgsCoordinateTransform(source_crs, dest_crs, QgsProject.instance())
+                            point = transform.transform(point)
+                    
+                    # Create an appropriate extent based on CRS type
+                    dest_crs = canvas.mapSettings().destinationCrs()
+                    if dest_crs.isGeographic():
+                        # For geographic CRS (degrees), use configurable buffer
+                        buffer = self.config_manager.get_setting("zoom_buffer_geographic", 0.001)
+                    else:
+                        # For projected CRS (meters/feet), use configurable buffer
+                        buffer = self.config_manager.get_setting("zoom_buffer_projected", 500)
+                        
+                    extent = QgsRectangle(point.x() - buffer, point.y() - buffer, point.x() + buffer, point.y() + buffer)
+                    canvas.setExtent(extent)
+                    canvas.refresh()
+                    return
+                    
+                elif isinstance(geometry, dict) and "lat" in geometry and "lon" in geometry:
+                    # Use legacy point coordinates from API results
                     lat = float(geometry["lat"])
                     lon = float(geometry["lon"])
                     
