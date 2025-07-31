@@ -1,3 +1,5 @@
 <qresource prefix="/plugins/configurable_search">
     <file>icon.svg</file>
+    <file>icon-mono-configure.svg</file>
+    <file>icon-mono-search.svg</file>
 </qresource>

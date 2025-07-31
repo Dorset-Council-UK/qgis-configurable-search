@@ -49,6 +49,7 @@ def install_plugin():
     # Copy plugin files
     files_to_copy = [
         '*.py',
+        '*.svg',
         'metadata.txt',
         'README.md',
         'requirements.txt',

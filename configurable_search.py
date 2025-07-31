@@ -146,18 +146,19 @@ class ConfigurableSearch:
     def initGui(self):
         """Create the menu entries and toolbar icons inside the QGIS GUI."""
 
-        icon_path = os.path.join(self.plugin_dir, 'icon.svg')
+        config_icon_path = os.path.join(self.plugin_dir, 'icon-mono-configure.svg')
+        search_icon_path = os.path.join(self.plugin_dir, 'icon-mono-search.svg')
         
         # Add configuration action
         self.add_action(
-            icon_path,
+            config_icon_path,
             text=self.tr(u'Configure Search'),
             callback=self.show_config_dialog,
             parent=self.iface.mainWindow())
         
         # Add toggle panel action
         self.add_action(
-            icon_path,
+            search_icon_path,
             text=self.tr(u'Toggle Search Panel'),
             callback=self.toggle_search_panel,
             parent=self.iface.mainWindow())

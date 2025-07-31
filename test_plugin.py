@@ -139,7 +139,9 @@ def show_plugin_info():
         'Makefile': 'Make build file',
         'setup.py': 'Python setup script',
         'requirements.txt': 'Python dependencies',
-        'icon.svg': 'Plugin icon'
+        'icon.svg': 'Plugin icon',
+        'icon-mono-configure.svg': 'Configure search icon',
+        'icon-mono-search.svg': 'Search icon'
     }
     
     print("\nOptional files:")
