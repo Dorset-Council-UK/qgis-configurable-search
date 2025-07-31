@@ -418,11 +418,23 @@ class ProviderEditDialog(QDialog):
         
         # Layer selection (for Layer providers)
         self.layer_combo = QComboBox()
+        self.layer_combo.currentTextChanged.connect(self.on_layer_changed)
         self.layer_label = QLabel("Layer:")
         form_layout.addRow(self.layer_label, self.layer_combo)
         
         # Populate layer combo with project layers
         self._populate_layer_combo()
+        
+        # Layer search configuration
+        self.search_fields_edit = QLineEdit()
+        self.search_fields_label = QLabel("Search Fields:")
+        self.search_fields_edit.setPlaceholderText("Leave empty for all text fields, or specify: field1,field2,field3")
+        form_layout.addRow(self.search_fields_label, self.search_fields_edit)
+        
+        self.search_mode_combo = QComboBox()
+        self.search_mode_combo.addItems(["Wildcard (contains)", "Exact match"])
+        self.search_mode_label = QLabel("Search Mode:")
+        form_layout.addRow(self.search_mode_label, self.search_mode_combo)
         
         # URL template (for API providers)
         self.url_edit = QLineEdit()
@@ -556,6 +568,37 @@ class ProviderEditDialog(QDialog):
         layer_visible = provider_type == "layer"
         self.layer_label.setVisible(layer_visible)
         self.layer_combo.setVisible(layer_visible)
+        self.search_fields_label.setVisible(layer_visible)
+        self.search_fields_edit.setVisible(layer_visible)
+        self.search_mode_label.setVisible(layer_visible)
+        self.search_mode_combo.setVisible(layer_visible)
+        
+    def on_layer_changed(self):
+        """Handle layer selection change to update search fields placeholder."""
+        # Check if search_fields_edit exists (may not during initial setup)
+        if not hasattr(self, 'search_fields_edit'):
+            return
+            
+        layer_id = self.layer_combo.currentData()
+        if layer_id:
+            project = QgsProject.instance()
+            layer = project.mapLayer(layer_id)
+            if layer and isinstance(layer, QgsVectorLayer):
+                # Get text fields from the layer
+                text_fields = []
+                for field in layer.fields():
+                    if field.type() in (QVariant.String, QVariant.Char):
+                        text_fields.append(field.name())
+                
+                if text_fields:
+                    placeholder = f"Available text fields: {', '.join(text_fields)}"
+                    self.search_fields_edit.setPlaceholderText(placeholder)
+                else:
+                    self.search_fields_edit.setPlaceholderText("No text fields found in this layer")
+            else:
+                self.search_fields_edit.setPlaceholderText("Select a layer to see available fields")
+        else:
+            self.search_fields_edit.setPlaceholderText("Leave empty for all text fields, or specify: field1,field2,field3")
         
     def load_provider(self):
         """Load provider data into the form."""
@@ -573,6 +616,14 @@ class ProviderEditDialog(QDialog):
         layer_index = self.layer_combo.findData(layer_id)
         if layer_index >= 0:
             self.layer_combo.setCurrentIndex(layer_index)
+            
+        # Load layer search configuration
+        search_fields = self.provider.get("search_fields", "")
+        self.search_fields_edit.setText(search_fields)
+        
+        search_mode = self.provider.get("search_mode", "wildcard")
+        mode_index = 0 if search_mode == "wildcard" else 1
+        self.search_mode_combo.setCurrentIndex(mode_index)
         
         method = self.provider.get("request_method", "GET")
         method_index = {"GET": 0, "POST": 1}.get(method, 0)
@@ -613,9 +664,11 @@ class ProviderEditDialog(QDialog):
             "result_parser": {}
         }
         
-        # Add layer_id for layer providers
+        # Add layer configuration for layer providers
         if self.type_combo.currentText().lower() == "layer":
             provider["layer_id"] = self.layer_combo.currentData()
+            provider["search_fields"] = self.search_fields_edit.text().strip()
+            provider["search_mode"] = "wildcard" if self.search_mode_combo.currentIndex() == 0 else "exact"
         
         # Parse headers
         headers_text = self.headers_edit.toPlainText().strip()

@@ -1,11 +1,12 @@
 import re
 import json
 import requests
-from qgis.PyQt.QtCore import QThread, pyqtSignal, QObject
+from qgis.PyQt.QtCore import QThread, pyqtSignal, QObject, QVariant
 from qgis.core import (
     QgsProject, QgsVectorLayer, QgsFeatureRequest, QgsGeometry, 
     QgsPointXY, QgsCoordinateReferenceSystem, QgsCoordinateTransform,
-    QgsRectangle, QgsMessageLog, Qgis, QgsApplication, QgsNetworkAccessManager
+    QgsRectangle, QgsMessageLog, Qgis, QgsApplication, QgsNetworkAccessManager,
+    QgsExpression
 )
 from qgis.gui import QgsMapCanvas
 from qgis.PyQt.QtNetwork import QNetworkRequest, QNetworkReply
@@ -403,47 +404,124 @@ class SearchEngine(QObject):
                 return [float(x) for x in raw_bbox[:4]]
             return raw_bbox
         
-    def _search_layer_features(self, layer, search_term, config):
-        """Search features within a layer."""
+    def _search_layer_features(self, layer, search_term, provider):
+        """Search features within a layer using efficient QGIS expressions."""
         results = []
-        max_features = config.get("max_features_per_layer", 50)
+        max_features = 50  # Default max features
+        
+        QgsMessageLog.logMessage(
+            f"Searching layer {layer.name()} with optimized expression", 
+            "Configurable Search", 
+            Qgis.Info
+        )
         
         try:
-            # Build feature request with text search
-            request = QgsFeatureRequest()
-            request.setLimit(max_features)
+            # Get search configuration from provider
+            search_fields = provider.get("search_fields", "").strip()
+            search_mode = provider.get("search_mode", "wildcard")
             
-            # Search in all string fields
-            features = layer.getFeatures(request)
-            count = 0
+            # Determine which fields to search
+            if search_fields:
+                # Use specified fields
+                field_names = [field.strip() for field in search_fields.split(",") if field.strip()]
+                # Validate that fields exist in layer
+                layer_field_names = [field.name() for field in layer.fields()]
+                field_names = [name for name in field_names if name in layer_field_names]
+            else:
+                # Use all string/text fields
+                field_names = []
+                for field in layer.fields():
+                    if field.type() in (QVariant.String, QVariant.Char):
+                        field_names.append(field.name())
             
-            for feature in features:
-                if count >= max_features:
-                    break
+            if not field_names:
+                QgsMessageLog.logMessage(
+                    f"No searchable fields found in layer {layer.name()}", 
+                    "Configurable Search", 
+                    Qgis.Warning
+                )
+                return results
+            
+            # Build search expression based on mode
+            expression_parts = []
+            escaped_search_term = search_term.replace("'", "''")  # Escape single quotes
+            
+            if search_mode == "exact":
+                # Exact match (case insensitive)
+                for field_name in field_names:
+                    expression_parts.append(f'upper("{field_name}") = upper(\'{escaped_search_term}\')')
+            else:
+                # Wildcard/contains match (case insensitive)
+                for field_name in field_names:
+                    expression_parts.append(f'"{field_name}" ILIKE \'%{escaped_search_term}%\'')
+            
+            # Combine expressions with OR
+            if expression_parts:
+                filter_expression = ' OR '.join(expression_parts)
+                
+                QgsMessageLog.logMessage(
+                    f"Using expression: {filter_expression}", 
+                    "Configurable Search", 
+                    Qgis.Info
+                )
+                
+                # Create feature request with expression filter
+                request = QgsFeatureRequest()
+                request.setFilterExpression(filter_expression)
+                request.setLimit(max_features)
+                
+                # Execute the filtered query
+                features = layer.getFeatures(request)
+                count = 0
+                
+                for feature in features:
+                    if count >= max_features:
+                        break
                     
-                # Check if any attribute contains the search term
-                for field_name in layer.fields().names():
-                    field_value = feature[field_name]
-                    if field_value and isinstance(field_value, str):
-                        if search_term.lower() in field_value.lower():
-                            results.append({
-                                "name": f"Feature: {field_value[:50]}{'...' if len(str(field_value)) > 50 else ''}",
-                                "provider": f"Layer: {layer.name()}",
-                                "type": "feature",
-                                "geometry": feature.geometry(),
-                                "data": {
-                                    "layer_id": layer.id(),
-                                    "layer_name": layer.name(),
-                                    "feature_id": feature.id(),
-                                    "attributes": feature.attributes(),
-                                    "search_term": search_term,
-                                    "matched_field": field_name,
-                                    "matched_value": field_value
-                                }
-                            })
-                            count += 1
-                            break
-                            
+                    # Find which field matched for display purposes
+                    matched_field = None
+                    matched_value = None
+                    
+                    for field_name in field_names:
+                        field_value = feature[field_name]
+                        if field_value and isinstance(field_value, str):
+                            if search_mode == "exact":
+                                if field_value.lower() == search_term.lower():
+                                    matched_field = field_name
+                                    matched_value = field_value
+                                    break
+                            else:
+                                if search_term.lower() in field_value.lower():
+                                    matched_field = field_name
+                                    matched_value = field_value
+                                    break
+                    
+                    if matched_field and matched_value:
+                        results.append({
+                            "name": f"Feature: {matched_value[:50]}{'...' if len(str(matched_value)) > 50 else ''}",
+                            "provider": f"Layer: {layer.name()}",
+                            "type": "feature",
+                            "geometry": feature.geometry(),
+                            "data": {
+                                "layer_id": layer.id(),
+                                "layer_name": layer.name(),
+                                "feature_id": feature.id(),
+                                "attributes": feature.attributes(),
+                                "search_term": search_term,
+                                "matched_field": matched_field,
+                                "matched_value": matched_value,
+                                "search_mode": search_mode,
+                                "search_fields": field_names
+                            }
+                        })
+                        count += 1
+                
+                QgsMessageLog.logMessage(
+                    f"Found {count} matching features in layer {layer.name()}", 
+                    "Configurable Search", 
+                    Qgis.Info
+                )
+                
         except Exception as e:
             QgsMessageLog.logMessage(
                 f"Error searching features in layer {layer.name()}: {str(e)}", 
@@ -468,7 +546,7 @@ class SearchEngine(QObject):
         return self._search_layer_features(
             layer, 
             search_term, 
-            {"max_features_per_layer": 50}  # Simple default config
+            provider  # Pass the full provider configuration
         )
         
     def _process_results(self, results, iface):
