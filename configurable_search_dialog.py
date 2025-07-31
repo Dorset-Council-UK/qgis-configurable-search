@@ -32,13 +32,9 @@ class ConfigurableSearchDialog(QDialog):
         # Create tab widget
         self.tab_widget = QTabWidget()
         
-        # API Providers tab
+        # Search Providers tab
         self.providers_tab = self.create_providers_tab()
-        self.tab_widget.addTab(self.providers_tab, "API Providers")
-        
-        # Layer Search tab
-        self.layers_tab = self.create_layers_tab()
-        self.tab_widget.addTab(self.layers_tab, "Layer Search")
+        self.tab_widget.addTab(self.providers_tab, "Search Providers")
         
         # General Settings tab
         self.settings_tab = self.create_settings_tab()
@@ -113,45 +109,6 @@ class ConfigurableSearchDialog(QDialog):
         widget.setLayout(layout)
         return widget
         
-    def create_layers_tab(self):
-        """Create the layer search configuration tab."""
-        widget = QWidget()
-        layout = QVBoxLayout()
-        
-        # Layer search settings
-        layer_group = QGroupBox("Layer Search Settings")
-        layer_layout = QFormLayout()
-        
-        self.include_layers_checkbox = QCheckBox("Enable layer search")
-        layer_layout.addRow(self.include_layers_checkbox)
-        
-        self.feature_search_checkbox = QCheckBox("Search within layer features")
-        layer_layout.addRow(self.feature_search_checkbox)
-        
-        self.max_features_spinbox = QSpinBox()
-        self.max_features_spinbox.setRange(1, 1000)
-        self.max_features_spinbox.setValue(50)
-        layer_layout.addRow("Max features per layer:", self.max_features_spinbox)
-        
-        layer_group.setLayout(layer_layout)
-        layout.addWidget(layer_group)
-        
-        # Available layers
-        layers_group = QGroupBox("Available Project Layers")
-        layers_layout = QVBoxLayout()
-        
-        self.layers_model = LayersTableModel()
-        self.layers_table = QTableView()
-        self.layers_table.setModel(self.layers_model)
-        
-        layers_layout.addWidget(self.layers_table)
-        layers_group.setLayout(layers_layout)
-        layout.addWidget(layers_group)
-        
-        layout.addStretch()
-        widget.setLayout(layout)
-        return widget
-        
     def create_settings_tab(self):
         """Create the general settings tab."""
         widget = QWidget()
@@ -209,17 +166,6 @@ class ConfigurableSearchDialog(QDialog):
         providers = self.config.get("search_providers", [])
         self.providers_model.set_providers(providers)
         
-        # Load layer settings
-        self.include_layers_checkbox.setChecked(
-            self.config.get("include_project_layers", True)
-        )
-        self.feature_search_checkbox.setChecked(
-            self.config.get("feature_search_enabled", True)
-        )
-        self.max_features_spinbox.setValue(
-            self.config.get("max_features_per_layer", 50)
-        )
-        
         # Load general settings
         self.stop_on_first_checkbox.setChecked(
             self.config.get("stop_on_first_result", False)
@@ -239,18 +185,11 @@ class ConfigurableSearchDialog(QDialog):
             self.config.get("zoom_buffer_projected", 500)
         )
         
-        # Load project layers
-        self.layers_model.load_project_layers()
         
     def save_config(self):
         """Save configuration from the UI."""
         # Save providers
         self.config["search_providers"] = self.providers_model.get_providers()
-        
-        # Save layer settings
-        self.config["include_project_layers"] = self.include_layers_checkbox.isChecked()
-        self.config["feature_search_enabled"] = self.feature_search_checkbox.isChecked()
-        self.config["max_features_per_layer"] = self.max_features_spinbox.value()
         
         # Save general settings
         self.config["stop_on_first_result"] = self.stop_on_first_checkbox.isChecked()
@@ -446,60 +385,6 @@ class ProvidersTableModel(QAbstractTableModel):
         return QVariant()
 
 
-class LayersTableModel(QAbstractTableModel):
-    """Table model for project layers."""
-    
-    def __init__(self):
-        super().__init__()
-        self.layers = []
-        self.headers = ["Layer Name", "Type", "Feature Count"]
-        
-    def load_project_layers(self):
-        """Load layers from the current project."""
-        self.beginResetModel()
-        self.layers = []
-        
-        project = QgsProject.instance()
-        for layer in project.mapLayers().values():
-            if isinstance(layer, QgsVectorLayer):
-                self.layers.append({
-                    "id": layer.id(),
-                    "name": layer.name(),
-                    "type": layer.geometryType().name if layer.geometryType() else "No Geometry",
-                    "feature_count": layer.featureCount()
-                })
-                
-        self.endResetModel()
-        
-    def rowCount(self, parent=QModelIndex()):
-        return len(self.layers)
-        
-    def columnCount(self, parent=QModelIndex()):
-        return len(self.headers)
-        
-    def data(self, index, role=Qt.DisplayRole):
-        if not index.isValid() or index.row() >= len(self.layers):
-            return QVariant()
-            
-        layer = self.layers[index.row()]
-        column = index.column()
-        
-        if role == Qt.DisplayRole:
-            if column == 0:  # Name
-                return layer.get("name", "")
-            elif column == 1:  # Type
-                return layer.get("type", "")
-            elif column == 2:  # Feature Count
-                return str(layer.get("feature_count", 0))
-                
-        return QVariant()
-        
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return self.headers[section]
-        return QVariant()
-
-
 class ProviderEditDialog(QDialog):
     """Dialog for editing search provider settings."""
     
@@ -530,6 +415,14 @@ class ProviderEditDialog(QDialog):
         
         self.enabled_checkbox = QCheckBox()
         form_layout.addRow("Enabled:", self.enabled_checkbox)
+        
+        # Layer selection (for Layer providers)
+        self.layer_combo = QComboBox()
+        self.layer_label = QLabel("Layer:")
+        form_layout.addRow(self.layer_label, self.layer_combo)
+        
+        # Populate layer combo with project layers
+        self._populate_layer_combo()
         
         # URL template (for API providers)
         self.url_edit = QLineEdit()
@@ -604,8 +497,14 @@ class ProviderEditDialog(QDialog):
         parser_layout.addRow("Longitude Field:", self.lon_field_edit)
         
         self.bbox_field_edit = QLineEdit()
-        self.bbox_field_edit.setPlaceholderText("boundingbox")
-        parser_layout.addRow("Bounding Box Field:", self.bbox_field_edit)
+        self.bbox_field_edit.setPlaceholderText("bbox or {west},{south},{east},{north}")
+        parser_layout.addRow("Bounding Box Field/Template:", self.bbox_field_edit)
+        
+        # Help text for bbox template
+        bbox_help = QLabel("Expected format: [west, south, east, north] in WGS84\n• Single field: 'bbox' (if API returns [west,south,east,north])\n• Template: '{west},{south},{east},{north}' or '{minX},{minY},{maxX},{maxY}'\n• Nominatim: '{boundingbox.2},{boundingbox.0},{boundingbox.3},{boundingbox.1}' (converts [south,north,west,east] to standard format)")
+        bbox_help.setStyleSheet("color: #666; font-style: italic; font-size: 11px;")
+        bbox_help.setWordWrap(True)
+        parser_layout.addRow("", bbox_help)
         
         self.parser_group.setLayout(parser_layout)
         layout.addWidget(self.parser_group)
@@ -629,6 +528,16 @@ class ProviderEditDialog(QDialog):
         # Initial visibility update
         self.on_type_changed()
         
+    def _populate_layer_combo(self):
+        """Populate the layer combo with available vector layers."""
+        self.layer_combo.clear()
+        self.layer_combo.addItem("Select a layer...", "")
+        
+        project = QgsProject.instance()
+        for layer_id, layer in project.mapLayers().items():
+            if isinstance(layer, QgsVectorLayer):
+                self.layer_combo.addItem(layer.name(), layer_id)
+        
     def on_type_changed(self):
         """Handle provider type change."""
         provider_type = self.type_combo.currentText().lower()
@@ -643,6 +552,11 @@ class ProviderEditDialog(QDialog):
         self.headers_group.setVisible(api_visible)
         self.parser_group.setVisible(api_visible)
         
+        # Show/hide Layer-specific controls
+        layer_visible = provider_type == "layer"
+        self.layer_label.setVisible(layer_visible)
+        self.layer_combo.setVisible(layer_visible)
+        
     def load_provider(self):
         """Load provider data into the form."""
         self.name_edit.setText(self.provider.get("name", ""))
@@ -653,6 +567,12 @@ class ProviderEditDialog(QDialog):
         
         self.enabled_checkbox.setChecked(self.provider.get("enabled", True))
         self.url_edit.setText(self.provider.get("url_template", ""))
+        
+        # Load layer selection
+        layer_id = self.provider.get("layer_id", "")
+        layer_index = self.layer_combo.findData(layer_id)
+        if layer_index >= 0:
+            self.layer_combo.setCurrentIndex(layer_index)
         
         method = self.provider.get("request_method", "GET")
         method_index = {"GET": 0, "POST": 1}.get(method, 0)
@@ -692,6 +612,10 @@ class ProviderEditDialog(QDialog):
             "auth_config_id": self.auth_config_select.configId(),
             "result_parser": {}
         }
+        
+        # Add layer_id for layer providers
+        if self.type_combo.currentText().lower() == "layer":
+            provider["layer_id"] = self.layer_combo.currentData()
         
         # Parse headers
         headers_text = self.headers_edit.toPlainText().strip()

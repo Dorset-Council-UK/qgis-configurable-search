@@ -40,7 +40,6 @@ class SearchEngine(QObject):
         # Get configuration
         providers = self.config_manager.get_search_providers()
         stop_on_first = self.config_manager.get_setting("stop_on_first_result", False)
-        include_layers = self.config_manager.get_setting("include_project_layers", True)
         
         # Sort providers by priority
         providers = sorted([p for p in providers if p.get("enabled", True)], 
@@ -65,11 +64,6 @@ class SearchEngine(QObject):
                 if stop_on_first:
                     search_stopped = True
                     break
-                    
-        # Search project layers if enabled and search wasn't stopped
-        if include_layers and not search_stopped:
-            layer_results = self._search_project_layers(search_term, iface)
-            results.extend(layer_results)
             
         # Process results
         self._process_results(results, iface)
@@ -302,7 +296,7 @@ class SearchEngine(QObject):
             name = self._extract_field(item, parser.get("name_field", "name"))
             lat = self._extract_field(item, parser.get("lat_field", "lat"))
             lon = self._extract_field(item, parser.get("lon_field", "lon"))
-            bbox = self._extract_field(item, parser.get("bbox_field", "bbox"))
+            bbox = self._extract_bbox(item, parser.get("bbox_field", "bbox"))
             
             if name:
                 result = {
@@ -336,7 +330,7 @@ class SearchEngine(QObject):
         return results
         
     def _extract_field(self, data, field_path):
-        """Extract a field from nested data using dot notation."""
+        """Extract a field from nested data using dot notation with array index support."""
         if not field_path or not data:
             return None
             
@@ -346,53 +340,68 @@ class SearchEngine(QObject):
         for part in parts:
             if isinstance(current, dict) and part in current:
                 current = current[part]
+            elif isinstance(current, list) and part.isdigit():
+                # Handle array indexing
+                index = int(part)
+                if 0 <= index < len(current):
+                    current = current[index]
+                else:
+                    return None
             else:
                 return None
                 
         return current
         
-    def _search_project_layers(self, search_term, iface):
-        """Search through project layers."""
-        results = []
-        project = QgsProject.instance()
+    def _extract_bbox(self, data, bbox_config):
+        """Extract bounding box using either field name or template with placeholders.
         
-        layer_config = self.config_manager.get_project_layers_config()
-        if not layer_config.get("enabled", True):
-            return results
+        Always returns bbox in format: [west, south, east, north] (standard GIS format)
+        Template format should be: {west},{south},{east},{north}
+        """
+        if not bbox_config or not data:
+            return None
             
-        # Search layer names
-        for layer in project.mapLayers().values():
-            if isinstance(layer, QgsVectorLayer):
-                # Search layer name and title
-                search_fields = layer_config.get("search_fields", ["name", "title"])
-                layer_matches = False
+        # Check if it's a template (contains curly braces)
+        if '{' in bbox_config and '}' in bbox_config:
+            # Template approach: extract values and create bbox array
+            try:
+                # Split by comma and extract field names from placeholders
+                template_parts = bbox_config.split(',')
+                bbox_values = []
                 
-                for field in search_fields:
-                    if field == "name" and search_term.lower() in layer.name().lower():
-                        layer_matches = True
-                        break
-                    elif field == "title" and hasattr(layer, 'title') and search_term.lower() in layer.title().lower():
-                        layer_matches = True
-                        break
-                        
-                if layer_matches:
-                    results.append({
-                        "name": f"Layer: {layer.name()}",
-                        "provider": "Project Layers",
-                        "type": "layer",
-                        "data": {
-                            "layer_id": layer.id(),
-                            "layer_name": layer.name(),
-                            "search_term": search_term
-                        }
-                    })
+                for part in template_parts:
+                    part = part.strip()
+                    if part.startswith('{') and part.endswith('}'):
+                        # Extract field name from {fieldName}
+                        field_name = part[1:-1].strip()
+                        value = self._extract_field(data, field_name)
+                        if value is not None:
+                            bbox_values.append(float(value))
+                        else:
+                            return None  # Missing required field
+                    else:
+                        # Direct value (though this would be unusual)
+                        try:
+                            bbox_values.append(float(part))
+                        except ValueError:
+                            return None
+                            
+                # Return as array if we have 4 values
+                # Template is expected to be in format: {west},{south},{east},{north}
+                if len(bbox_values) == 4:
+                    return bbox_values  # Already in [west, south, east, north] format
+                else:
+                    return None
                     
-                # Search features if enabled
-                if layer_config.get("feature_search_enabled", True):
-                    feature_results = self._search_layer_features(layer, search_term, layer_config)
-                    results.extend(feature_results)
-                    
-        return results
+            except (ValueError, TypeError):
+                return None
+        else:
+            # Single field approach - assume standard [west, south, east, north] format
+            raw_bbox = self._extract_field(data, bbox_config)
+            if raw_bbox and isinstance(raw_bbox, list) and len(raw_bbox) >= 4:
+                # Assume bbox is already in standard [west, south, east, north] format
+                return [float(x) for x in raw_bbox[:4]]
+            return raw_bbox
         
     def _search_layer_features(self, layer, search_term, config):
         """Search features within a layer."""
@@ -459,7 +468,7 @@ class SearchEngine(QObject):
         return self._search_layer_features(
             layer, 
             search_term, 
-            self.config_manager.get_project_layers_config()
+            {"max_features_per_layer": 50}  # Simple default config
         )
         
     def _process_results(self, results, iface):
@@ -487,9 +496,10 @@ class SearchEngine(QObject):
             
             if "bbox" in result:
                 # Use bounding box if available
+                # Expected bbox format: [west, south, east, north] in WGS84
                 bbox = result["bbox"]
                 if len(bbox) >= 4:
-                    rect = QgsRectangle(float(bbox[2]), float(bbox[0]), float(bbox[3]), float(bbox[1]))
+                    rect = QgsRectangle(float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3]))
                     
                     # Transform bbox if needed
                     source_crs = QgsCoordinateReferenceSystem("EPSG:4326")

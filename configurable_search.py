@@ -3,7 +3,7 @@ import sys
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QThread, pyqtSignal, QTimer
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy, QDockWidget
-from qgis.core import QgsProject, QgsMessageLog, Qgis
+from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsGeometry, QgsRectangle, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPointXY
 from qgis.gui import QgsGui
 
 # Initialize Qt resources from file resources.py
@@ -410,8 +410,17 @@ class SearchWidget(QWidget):
         # Add coordinate info if available
         if "geometry" in result:
             geom = result["geometry"]
-            if "lat" in geom and "lon" in geom:
+            if isinstance(geom, dict) and "lat" in geom and "lon" in geom:
+                # API-style geometry with lat/lon coordinates
                 lines.append(f"Coordinates: {geom['lat']:.6f}, {geom['lon']:.6f}")
+            elif hasattr(geom, 'centroid'):
+                # QgsGeometry object from layer features
+                try:
+                    if isinstance(geom, QgsGeometry) and not geom.isEmpty():
+                        centroid = geom.centroid().asPoint()
+                        lines.append(f"Coordinates: {centroid.y():.6f}, {centroid.x():.6f}")
+                except Exception:
+                    pass  # Skip coordinate display if centroid calculation fails
                 
         # Add bounding box info if available
         if "bbox" in result:
@@ -442,15 +451,13 @@ class SearchWidget(QWidget):
             
             if "bbox" in result:
                 # Use bounding box if available
-                # Nominatim bbox format: [south, north, west, east] in WGS84
+                # Expected bbox format: [west, south, east, north] in WGS84
                 bbox = result["bbox"]
                 if len(bbox) >= 4:
-                    from qgis.core import QgsRectangle, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject
+                    # Create rectangle from bbox: [west, south, east, north]
+                    rect = QgsRectangle(float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3]))
                     
-                    # Create rectangle from bbox: [south, north, west, east] -> [west, south, east, north]
-                    rect = QgsRectangle(float(bbox[2]), float(bbox[0]), float(bbox[3]), float(bbox[1]))
-                    
-                    # Transform bbox if needed (Nominatim returns WGS84)
+                    # Transform bbox if needed (assuming WGS84 input)
                     source_crs = QgsCoordinateReferenceSystem("EPSG:4326")
                     dest_crs = canvas.mapSettings().destinationCrs()
                     
@@ -462,41 +469,37 @@ class SearchWidget(QWidget):
                     canvas.refresh()
                     return
                     
-            if "geometry" in result and "lat" in result["geometry"] and "lon" in result["geometry"]:
-                # Use point coordinates
-                from qgis.core import QgsPointXY, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsProject, QgsRectangle
-                
-                lat = float(result["geometry"]["lat"])
-                lon = float(result["geometry"]["lon"])
-                
-                point = QgsPointXY(lon, lat)
-                
-                # Transform if needed (assuming WGS84 input)
-                source_crs = QgsCoordinateReferenceSystem("EPSG:4326")
-                dest_crs = canvas.mapSettings().destinationCrs()
-                
-                if source_crs != dest_crs:
-                    transform = QgsCoordinateTransform(source_crs, dest_crs, QgsProject.instance())
-                    point = transform.transform(point)
+            if "geometry" in result:
+                geometry = result["geometry"]
+                if isinstance(geometry, dict) and "lat" in geometry and "lon" in geometry:
+                    # Use point coordinates from API results
+                    lat = float(geometry["lat"])
+                    lon = float(geometry["lon"])
                     
-                # Create an appropriate extent based on CRS type
-                if dest_crs.isGeographic():
-                    # For geographic CRS (degrees), use configurable buffer
-                    buffer = self.config_manager.get_setting("zoom_buffer_geographic", 0.001)
-                else:
-                    # For projected CRS (meters/feet), use configurable buffer
-                    buffer = self.config_manager.get_setting("zoom_buffer_projected", 500)
+                    point = QgsPointXY(lon, lat)
                     
-                extent = QgsRectangle(point.x() - buffer, point.y() - buffer, point.x() + buffer, point.y() + buffer)
-                canvas.setExtent(extent)
-                canvas.refresh()
-                return
-                
-            # Handle feature geometry
-            if result.get("type") == "feature" and result.get("geometry"):
-                from qgis.core import QgsGeometry
-                geometry = result.get("geometry")
-                if isinstance(geometry, QgsGeometry):
+                    # Transform if needed (assuming WGS84 input)
+                    source_crs = QgsCoordinateReferenceSystem("EPSG:4326")
+                    dest_crs = canvas.mapSettings().destinationCrs()
+                    
+                    if source_crs != dest_crs:
+                        transform = QgsCoordinateTransform(source_crs, dest_crs, QgsProject.instance())
+                        point = transform.transform(point)
+                        
+                    # Create an appropriate extent based on CRS type
+                    if dest_crs.isGeographic():
+                        # For geographic CRS (degrees), use configurable buffer
+                        buffer = self.config_manager.get_setting("zoom_buffer_geographic", 0.001)
+                    else:
+                        # For projected CRS (meters/feet), use configurable buffer
+                        buffer = self.config_manager.get_setting("zoom_buffer_projected", 500)
+                        
+                    extent = QgsRectangle(point.x() - buffer, point.y() - buffer, point.x() + buffer, point.y() + buffer)
+                    canvas.setExtent(extent)
+                    canvas.refresh()
+                    return
+                elif isinstance(geometry, QgsGeometry):
+                    # Handle QgsGeometry from layer features  
                     bbox = geometry.boundingBox()
                     # Expand bbox slightly
                     bbox = bbox.buffered(bbox.width() * 0.1 if bbox.width() > 0 else 1000)
@@ -505,7 +508,6 @@ class SearchWidget(QWidget):
                     return
                     
         except Exception as e:
-            from qgis.core import QgsMessageLog, Qgis
             QgsMessageLog.logMessage(
                 f"Error zooming to result: {str(e)}", 
                 "Configurable Search", 

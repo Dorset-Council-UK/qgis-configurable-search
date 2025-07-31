@@ -15,7 +15,6 @@ class ConfigManager:
             "stop_on_first_result": False,
             "max_results_per_provider": 10,
             "search_timeout": 30,
-            "include_project_layers": True,
             "zoom_buffer_geographic": 0.001,  # Buffer for geographic CRS (degrees)
             "zoom_buffer_projected": 500      # Buffer for projected CRS (meters/feet)
         }
@@ -57,15 +56,6 @@ class ConfigManager:
         config[key] = value
         self.save_config(config)
         
-    def get_project_layers_config(self):
-        """Get configuration for project layer searching."""
-        return {
-            "enabled": self.get_setting("include_project_layers", True),
-            "search_fields": self.get_setting("layer_search_fields", ["name", "title"]),
-            "feature_search_enabled": self.get_setting("feature_search_enabled", True),
-            "max_features_per_layer": self.get_setting("max_features_per_layer", 50)
-        }
-        
     def create_default_providers(self):
         """Create some default search providers as examples."""
         default_providers = [
@@ -84,7 +74,7 @@ class ConfigManager:
                     "name_field": "display_name",
                     "lat_field": "lat",
                     "lon_field": "lon",
-                    "bbox_field": "boundingbox"
+                    "bbox_field": "{boundingbox.2},{boundingbox.0},{boundingbox.3},{boundingbox.1}"
                 }
             },
             {
