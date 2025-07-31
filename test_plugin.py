@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for Configurable Search QGIS Plugin.
+Test script for Advanced Search Panel QGIS Plugin.
 This script performs basic validation of the plugin structure and configuration.
 """
 
@@ -152,7 +152,7 @@ def show_plugin_info():
 
 def main():
     """Run all tests."""
-    print("Configurable Search Plugin Validator")
+    print("Advanced Search Panel Plugin Validator")
     print("=" * 40)
     
     tests = [

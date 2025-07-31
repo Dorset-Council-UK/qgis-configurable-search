@@ -12,8 +12,8 @@ from qgis.core import QgsProject, QgsVectorLayer, QgsApplication
 from qgis.gui import QgsAuthConfigSelect
 
 
-class ConfigurableSearchDialog(QDialog):
-    """Configuration dialog for the Configurable Search plugin."""
+class AdvancedSearchPanelDialog(QDialog):
+    """Configuration dialog for the Advanced Search Panel plugin."""
     
     def __init__(self, config_manager):
         super().__init__()
@@ -24,7 +24,7 @@ class ConfigurableSearchDialog(QDialog):
         
     def setup_ui(self):
         """Setup the user interface."""
-        self.setWindowTitle("Configurable Search Settings")
+        self.setWindowTitle("Advanced Search Panel Settings")
         self.setMinimumSize(800, 600)
         
         layout = QVBoxLayout()

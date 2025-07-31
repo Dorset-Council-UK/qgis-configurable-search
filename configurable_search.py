@@ -8,12 +8,12 @@ from qgis.gui import QgsGui
 
 # Initialize Qt resources from file resources.py
 from .resources import *
-from .configurable_search_dialog import ConfigurableSearchDialog
+from .configurable_search_dialog import AdvancedSearchPanelDialog
 from .search_engine import SearchEngine
 from .config_manager import ConfigManager
 
 
-class ConfigurableSearch:
+class AdvancedSearchPanel:
     """QGIS Plugin Implementation."""
 
     def __init__(self, iface):
@@ -38,7 +38,7 @@ class ConfigurableSearch:
         locale_path = os.path.join(
             self.plugin_dir,
             'i18n',
-            'ConfigurableSearch_{}.qm'.format(locale))
+            'AdvancedSearchPanel_{}.qm'.format(locale))
 
         if os.path.exists(locale_path):
             self.translator = QTranslator()
@@ -47,7 +47,7 @@ class ConfigurableSearch:
 
         # Declare instance attributes
         self.actions = []
-        self.menu = self.tr(u'&Configurable Search')
+        self.menu = self.tr(u'&Advanced Search Panel')
         self.toolbar = None
         self.search_widget = None
         self.config_manager = ConfigManager()
@@ -70,7 +70,7 @@ class ConfigurableSearch:
         :rtype: QString
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-        return QCoreApplication.translate('ConfigurableSearch', message)
+        return QCoreApplication.translate('AdvancedSearchPanel', message)
 
     def add_action(
         self,
@@ -152,14 +152,14 @@ class ConfigurableSearch:
         # Add configuration action
         self.add_action(
             config_icon_path,
-            text=self.tr(u'Configure Search'),
+            text=self.tr(u'Configure Advanced Search'),
             callback=self.show_config_dialog,
             parent=self.iface.mainWindow())
         
         # Add toggle panel action
         self.add_action(
             search_icon_path,
-            text=self.tr(u'Toggle Search Panel'),
+            text=self.tr(u'Toggle Advanced Search Panel'),
             callback=self.toggle_search_panel,
             parent=self.iface.mainWindow())
 
@@ -175,8 +175,8 @@ class ConfigurableSearch:
         self.search_widget = SearchWidget(self.search_engine, self.config_manager, self.iface)
         
         # Create dock widget
-        self.dock_widget = QDockWidget("Configurable Search", self.iface.mainWindow())
-        self.dock_widget.setObjectName("ConfigurableSearchDock")
+        self.dock_widget = QDockWidget("Advanced Search Panel", self.iface.mainWindow())
+        self.dock_widget.setObjectName("AdvancedSearchPanelDock")
         self.dock_widget.setWidget(self.search_widget)
         
         # Set dock widget properties
@@ -198,7 +198,7 @@ class ConfigurableSearch:
         """Removes the plugin menu item and icon from QGIS GUI."""
         for action in self.actions:
             self.iface.removePluginMenu(
-                self.tr(u'&Configurable Search'),
+                self.tr(u'&Advanced Search Panel'),
                 action)
             self.iface.removeToolBarIcon(action)
         
@@ -217,7 +217,7 @@ class ConfigurableSearch:
         if hasattr(self, 'dlg') and self.dlg:
             pass
         else:
-            self.dlg = ConfigurableSearchDialog(self.config_manager)
+            self.dlg = AdvancedSearchPanelDialog(self.config_manager)
 
         # show the dialog
         self.dlg.show()
@@ -261,7 +261,7 @@ class SearchWidget(QWidget):
         search_layout.setContentsMargins(0, 0, 0, 0)
         
         # Panel title/header
-        panel_title = QLabel("🔍 Configurable Search")
+        panel_title = QLabel("🔍 Search")
         panel_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #333; margin-bottom: 5px;")
         main_layout.addWidget(panel_title)
         
@@ -552,7 +552,7 @@ class SearchWidget(QWidget):
         except Exception as e:
             QgsMessageLog.logMessage(
                 f"Error zooming to result: {str(e)}", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             

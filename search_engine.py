@@ -110,7 +110,7 @@ class SearchEngine(QObject):
         except Exception as e:
             QgsMessageLog.logMessage(
                 f"Error searching provider {provider.get('name', 'Unknown')}: {str(e)}", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             
@@ -146,7 +146,7 @@ class SearchEngine(QObject):
             except Exception as e:
                 QgsMessageLog.logMessage(
                     f"Coordinate transformation failed: {str(e)}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Warning
                 )
                 return []
@@ -304,7 +304,7 @@ class SearchEngine(QObject):
         except Exception as e:
             QgsMessageLog.logMessage(
                 f"Error parsing response from {provider.get('name', 'API')}: {str(e)}", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             
@@ -324,7 +324,7 @@ class SearchEngine(QObject):
             if not auth_manager.updateNetworkRequest(request, auth_config_id):
                 QgsMessageLog.logMessage(
                     f"Failed to apply authentication config {auth_config_id}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Warning
                 )
                 return None
@@ -346,7 +346,7 @@ class SearchEngine(QObject):
             else:
                 QgsMessageLog.logMessage(
                     f"Unsupported HTTP method for authenticated requests: {method}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Warning
                 )
                 return None
@@ -360,7 +360,7 @@ class SearchEngine(QObject):
             if reply.error() != QNetworkReply.NoError:
                 QgsMessageLog.logMessage(
                     f"Network error for {provider.get('name', 'API')}: {reply.errorString()}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Warning
                 )
                 reply.deleteLater()
@@ -376,7 +376,7 @@ class SearchEngine(QObject):
         except Exception as e:
             QgsMessageLog.logMessage(
                 f"Error in authenticated request for {provider.get('name', 'API')}: {str(e)}", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             return None
@@ -390,7 +390,7 @@ class SearchEngine(QObject):
             timeout = self.config_manager.get_setting("search_timeout", 30)
             QgsMessageLog.logMessage(
                     f"Making request to {url}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Info
                 )
             if method == "GET":
@@ -400,7 +400,7 @@ class SearchEngine(QObject):
             else:
                 QgsMessageLog.logMessage(
                     f"Unsupported HTTP method: {method}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Warning
                 )
                 return None
@@ -413,7 +413,7 @@ class SearchEngine(QObject):
             else:
                 QgsMessageLog.logMessage(
                     f"Non-JSON response from {provider.get('name', 'API')}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Warning
                 )
                 return None
@@ -421,7 +421,7 @@ class SearchEngine(QObject):
         except requests.RequestException as e:
             QgsMessageLog.logMessage(
                 f"Request error for {provider.get('name', 'API')}: {str(e)}", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             return None
@@ -568,7 +568,7 @@ class SearchEngine(QObject):
         print(f"DEBUG: Starting layer search in {layer.name()}")
         QgsMessageLog.logMessage(
             f"Searching layer {layer.name()} with optimized expression", 
-            "Configurable Search", 
+            "Advanced Search Panel", 
             Qgis.Info
         )
         
@@ -599,7 +599,7 @@ class SearchEngine(QObject):
             if not field_names:
                 QgsMessageLog.logMessage(
                     f"No searchable fields found in layer {layer.name()}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Warning
                 )
                 return results
@@ -625,7 +625,7 @@ class SearchEngine(QObject):
                 
                 QgsMessageLog.logMessage(
                     f"Using expression: {filter_expression}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Info
                 )
                 
@@ -682,7 +682,7 @@ class SearchEngine(QObject):
                 
                 QgsMessageLog.logMessage(
                     f"Found {count} matching features in layer {layer.name()}", 
-                    "Configurable Search", 
+                    "Advanced Search Panel", 
                     Qgis.Info
                 )
                 print(f"DEBUG: Layer search completed, returning {count} results")
@@ -692,7 +692,7 @@ class SearchEngine(QObject):
             print(f"DEBUG: Layer search error: {error_msg}")
             QgsMessageLog.logMessage(
                 error_msg, 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             
@@ -704,7 +704,7 @@ class SearchEngine(QObject):
         if not layer_id:
             QgsMessageLog.logMessage(
                 f"Layer provider '{provider.get('name', 'Unknown')}' has no layer_id configured", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             return []
@@ -715,7 +715,7 @@ class SearchEngine(QObject):
         if not layer:
             QgsMessageLog.logMessage(
                 f"Layer provider '{provider.get('name', 'Unknown')}' references layer ID '{layer_id}' which doesn't exist in current project", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             return []
@@ -723,7 +723,7 @@ class SearchEngine(QObject):
         if not isinstance(layer, QgsVectorLayer):
             QgsMessageLog.logMessage(
                 f"Layer provider '{provider.get('name', 'Unknown')}' references layer '{layer.name()}' which is not a vector layer", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Warning
             )
             return []
@@ -766,14 +766,14 @@ class SearchEngine(QObject):
         if not results:
             QgsMessageLog.logMessage(
                 "No search results found", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Info
             )
         else:
             # Log results
             QgsMessageLog.logMessage(
                 f"Found {len(results)} search results", 
-                "Configurable Search", 
+                "Advanced Search Panel", 
                 Qgis.Info
             )
         

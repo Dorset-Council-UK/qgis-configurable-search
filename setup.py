@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Setup script for Configurable Search QGIS Plugin development.
+Setup script for Advanced Search Panel QGIS Plugin development.
 """
 
 import os
@@ -39,7 +39,7 @@ def build_resources():
 
 def install_plugin():
     """Install the plugin to QGIS plugins directory."""
-    plugin_dir = get_qgis_plugin_dir() / 'configurable_search'
+    plugin_dir = get_qgis_plugin_dir() / 'advanced_search_panel'
     
     print(f"Installing plugin to: {plugin_dir}")
     
@@ -73,7 +73,7 @@ def install_plugin():
 
 def create_development_link():
     """Create a symbolic link for development."""
-    plugin_dir = get_qgis_plugin_dir() / 'configurable_search'
+    plugin_dir = get_qgis_plugin_dir() / 'advanced_search_panel'
     current_dir = Path.cwd()
     
     if plugin_dir.exists():
@@ -98,7 +98,7 @@ def create_development_link():
 def main():
     """Main setup function."""
     if len(sys.argv) < 2:
-        print("Configurable Search QGIS Plugin Setup")
+        print("Advanced Search Panel QGIS Plugin Setup")
         print("")
         print("Usage:")
         print("  python setup.py build       - Build resources")
@@ -129,12 +129,12 @@ def main():
     
     elif command == 'info':
         plugin_dir = get_qgis_plugin_dir()
-        print("Configurable Search QGIS Plugin")
+        print("Advanced Search Panel QGIS Plugin")
         print("=" * 40)
         print(f"Current directory: {Path.cwd()}")
         print(f"QGIS plugins directory: {plugin_dir}")
-        print(f"Plugin directory: {plugin_dir / 'configurable_search'}")
-        print(f"Plugin exists: {(plugin_dir / 'configurable_search').exists()}")
+        print(f"Plugin directory: {plugin_dir / 'advanced_search_panel'}")
+        print(f"Plugin exists: {(plugin_dir / 'advanced_search_panel').exists()}")
         
         # Count files
         import glob
