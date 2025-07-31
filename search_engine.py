@@ -535,12 +535,30 @@ class SearchEngine(QObject):
         """Search a specific layer provider."""
         layer_id = provider.get("layer_id")
         if not layer_id:
+            QgsMessageLog.logMessage(
+                f"Layer provider '{provider.get('name', 'Unknown')}' has no layer_id configured", 
+                "Configurable Search", 
+                Qgis.Warning
+            )
             return []
             
         project = QgsProject.instance()
         layer = project.mapLayer(layer_id)
         
-        if not layer or not isinstance(layer, QgsVectorLayer):
+        if not layer:
+            QgsMessageLog.logMessage(
+                f"Layer provider '{provider.get('name', 'Unknown')}' references layer ID '{layer_id}' which doesn't exist in current project", 
+                "Configurable Search", 
+                Qgis.Warning
+            )
+            return []
+            
+        if not isinstance(layer, QgsVectorLayer):
+            QgsMessageLog.logMessage(
+                f"Layer provider '{provider.get('name', 'Unknown')}' references layer '{layer.name()}' which is not a vector layer", 
+                "Configurable Search", 
+                Qgis.Warning
+            )
             return []
             
         return self._search_layer_features(
@@ -548,6 +566,33 @@ class SearchEngine(QObject):
             search_term, 
             provider  # Pass the full provider configuration
         )
+        
+    def validate_layer_providers(self):
+        """Validate that all layer providers reference existing layers.
+        
+        Returns:
+            list: List of validation warnings for missing/invalid layers
+        """
+        warnings = []
+        providers = self.config_manager.get_search_providers()
+        project = QgsProject.instance()
+        
+        for provider in providers:
+            if provider.get("provider_type") == "layer" and provider.get("enabled", True):
+                layer_id = provider.get("layer_id")
+                provider_name = provider.get("name", "Unknown")
+                
+                if not layer_id:
+                    warnings.append(f"Layer provider '{provider_name}' has no layer configured")
+                    continue
+                    
+                layer = project.mapLayer(layer_id)
+                if not layer:
+                    warnings.append(f"Layer provider '{provider_name}' references missing layer (ID: {layer_id})")
+                elif not isinstance(layer, QgsVectorLayer):
+                    warnings.append(f"Layer provider '{provider_name}' references non-vector layer '{layer.name()}'")
+                    
+        return warnings
         
     def _process_results(self, results, iface):
         """Process search results without automatic zooming."""

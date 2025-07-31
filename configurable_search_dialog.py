@@ -549,6 +549,27 @@ class ProviderEditDialog(QDialog):
         for layer_id, layer in project.mapLayers().items():
             if isinstance(layer, QgsVectorLayer):
                 self.layer_combo.addItem(layer.name(), layer_id)
+                
+    def validate_layer_selection(self):
+        """Check if the currently selected layer still exists and show status."""
+        if not hasattr(self, 'layer_combo'):
+            return True
+            
+        layer_id = self.layer_combo.currentData()
+        if not layer_id:
+            return True
+            
+        project = QgsProject.instance()
+        layer = project.mapLayer(layer_id)
+        
+        if not layer:
+            # Layer doesn't exist - could update UI to show warning
+            return False
+        elif not isinstance(layer, QgsVectorLayer):
+            # Not a vector layer
+            return False
+            
+        return True
         
     def on_type_changed(self):
         """Handle provider type change."""
