@@ -287,16 +287,23 @@ class SearchEngine(QObject):
         # Replace placeholder with search term
         url = url_template.replace("{search_term}", requests.utils.quote(search_term))
         
+        # Process POST body template if provided
+        post_body_template = provider.get("post_body", "")
+        post_body = ""
+        if post_body_template:
+            # For POST body, don't URL-encode the search term since it will be in JSON/XML
+            post_body = post_body_template.replace("{search_term}", search_term)
+        
         try:
             # Check if authentication configuration is specified
             auth_config_id = provider.get("auth_config_id", "")
             
             if auth_config_id:
                 # Use QGIS authentication system
-                response_data = self._make_authenticated_request(url, provider, auth_config_id)
+                response_data = self._make_authenticated_request(url, provider, auth_config_id, post_body)
             else:
                 # Use regular requests with manual headers
-                response_data = self._make_regular_request(url, provider)
+                response_data = self._make_regular_request(url, provider, post_body)
                 
             if response_data:
                 return self._parse_api_results(response_data, provider, search_term)
@@ -310,7 +317,7 @@ class SearchEngine(QObject):
             
         return []
         
-    def _make_authenticated_request(self, url, provider, auth_config_id):
+    def _make_authenticated_request(self, url, provider, auth_config_id, post_body=""):
         """Make an authenticated request using QGIS authentication system."""
         try:
             # Get QGIS network access manager
@@ -342,7 +349,9 @@ class SearchEngine(QObject):
             if method == "GET":
                 reply = nam.get(request)
             elif method == "POST":
-                reply = nam.post(request, b"")  # Empty POST data for now
+                # Use POST body if provided, otherwise empty
+                post_data = post_body.encode('utf-8') if post_body else b""
+                reply = nam.post(request, post_data)
             else:
                 QgsMessageLog.logMessage(
                     f"Unsupported HTTP method for authenticated requests: {method}", 
@@ -381,7 +390,7 @@ class SearchEngine(QObject):
             )
             return None
     
-    def _make_regular_request(self, url, provider):
+    def _make_regular_request(self, url, provider, post_body=""):
         """Make a regular request using the requests library."""
         try:
             # Make request
@@ -396,7 +405,9 @@ class SearchEngine(QObject):
             if method == "GET":
                 response = requests.get(url, headers=headers, timeout=timeout)
             elif method == "POST":
-                response = requests.post(url, headers=headers, timeout=timeout)
+                # Use POST body if provided
+                data = post_body.encode('utf-8') if post_body else None
+                response = requests.post(url, headers=headers, data=data, timeout=timeout)
             else:
                 QgsMessageLog.logMessage(
                     f"Unsupported HTTP method: {method}", 
@@ -407,6 +418,18 @@ class SearchEngine(QObject):
                 
             response.raise_for_status()
             
+            QgsMessageLog.logMessage(
+                f"{response.status_code} response from {provider.get('name', 'API')}", 
+                "Advanced Search Panel", 
+                Qgis.Warning
+            )
+
+            QgsMessageLog.logMessage(
+                f"{response.content}", 
+                "Advanced Search Panel", 
+                Qgis.Warning
+            )
+
             # Parse response
             if response.headers.get('content-type', '').startswith('application/json'):
                 return response.json()
@@ -431,15 +454,9 @@ class SearchEngine(QObject):
         results = []
         parser = provider.get("result_parser", {})
         
-        # Handle different data structures
-        items = data
-        if isinstance(data, dict):
-            # Look for common array keys
-            for key in ["results", "features", "items", "data"]:
-                if key in data and isinstance(data[key], list):
-                    items = data[key]
-                    break
-                    
+        # Get the results array using configurable path
+        items = self._extract_results_array(data, parser)
+        
         if not isinstance(items, list):
             items = [items] if items else []
             
@@ -485,6 +502,25 @@ class SearchEngine(QObject):
                 results.append(result)
                 
         return results
+        
+    def _extract_results_array(self, data, parser):
+        """Extract the results array using configurable path or fallback logic."""
+        # Check if a custom results path is specified
+        results_path = parser.get("results_path", "")
+        
+        if results_path:
+            # Use the specified path to extract results array
+            return self._extract_field(data, results_path)
+        else:
+            # Fallback to automatic detection
+            items = data
+            if isinstance(data, dict):
+                # Look for common array keys
+                for key in ["results", "features", "items", "data", "places"]:
+                    if key in data and isinstance(data[key], list):
+                        items = data[key]
+                        break
+            return items
         
     def _extract_field(self, data, field_path):
         """Extract a field from nested data using dot notation with array index support."""

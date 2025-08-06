@@ -450,8 +450,28 @@ class ProviderEditDialog(QDialog):
         # HTTP method
         self.method_combo = QComboBox()
         self.method_combo.addItems(["GET", "POST"])
+        self.method_combo.currentTextChanged.connect(self.on_method_changed)
         self.method_label = QLabel("HTTP Method:")
         form_layout.addRow(self.method_label, self.method_combo)
+        
+        # POST body (for POST requests)
+        self.post_body_edit = QTextEdit()
+        self.post_body_edit.setMinimumHeight(80)
+        self.post_body_edit.setMaximumHeight(120)
+        self.post_body_edit.setPlaceholderText("Enter POST body template. Use {search_term} as placeholder.\nExample: {\"query\": \"{search_term}\", \"limit\": 10}")
+        self.post_body_label = QLabel("POST Body Template:")
+        form_layout.addRow(self.post_body_label, self.post_body_edit)
+        
+        # POST body help text
+        self.post_body_help_label = QLabel("Use {search_term} as placeholder for the search query in JSON, XML, or other formats")
+        self.post_body_help_label.setStyleSheet("color: #666; font-style: italic; font-size: 11px;")
+        self.post_body_help_label.setWordWrap(True)
+        form_layout.addRow("", self.post_body_help_label)
+        
+        # Add some spacing
+        spacer_label = QLabel("")
+        spacer_label.setMaximumHeight(10)
+        form_layout.addRow("", spacer_label)
         
         # Regex filter
         self.regex_edit = QLineEdit()
@@ -496,6 +516,16 @@ class ProviderEditDialog(QDialog):
         self.parser_group = QGroupBox("Result Parser")
         parser_layout = QFormLayout()
         
+        self.results_path_edit = QLineEdit()
+        self.results_path_edit.setPlaceholderText("places (leave empty for auto-detection)")
+        parser_layout.addRow("Results Array Path:", self.results_path_edit)
+        
+        # Help text for results path
+        results_path_help = QLabel("Specify the path to the results array using dot notation.\nExamples: 'places', 'data.results', 'response.items'\nLeave empty to auto-detect common array keys.")
+        results_path_help.setStyleSheet("color: #666; font-style: italic; font-size: 11px;")
+        results_path_help.setWordWrap(True)
+        parser_layout.addRow("", results_path_help)
+        
         self.name_field_edit = QLineEdit()
         self.name_field_edit.setPlaceholderText("name")
         parser_layout.addRow("Name Field:", self.name_field_edit)
@@ -539,6 +569,14 @@ class ProviderEditDialog(QDialog):
         
         # Initial visibility update
         self.on_type_changed()
+        self.on_method_changed()
+        
+    def on_method_changed(self):
+        """Handle HTTP method change to show/hide POST body fields."""
+        is_post = self.method_combo.currentText() == "POST"
+        self.post_body_label.setVisible(is_post)
+        self.post_body_edit.setVisible(is_post)
+        self.post_body_help_label.setVisible(is_post)
         
     def _populate_layer_combo(self):
         """Populate the layer combo with available vector layers."""
@@ -584,6 +622,14 @@ class ProviderEditDialog(QDialog):
         self.method_combo.setVisible(api_visible)
         self.headers_group.setVisible(api_visible)
         self.parser_group.setVisible(api_visible)
+        
+        # Handle POST body visibility (only for API providers and POST method)
+        if api_visible:
+            self.on_method_changed()
+        else:
+            self.post_body_label.setVisible(False)
+            self.post_body_edit.setVisible(False)
+            self.post_body_help_label.setVisible(False)
         
         # Show/hide Layer-specific controls
         layer_visible = provider_type == "layer"
@@ -650,6 +696,9 @@ class ProviderEditDialog(QDialog):
         method_index = {"GET": 0, "POST": 1}.get(method, 0)
         self.method_combo.setCurrentIndex(method_index)
         
+        # Load POST body
+        self.post_body_edit.setPlainText(self.provider.get("post_body", ""))
+        
         self.regex_edit.setText(self.provider.get("regex_filter", ""))
         self.stop_checkbox.setChecked(self.provider.get("stop_on_result", False))
         
@@ -665,6 +714,7 @@ class ProviderEditDialog(QDialog):
             
         # Load parser settings
         parser = self.provider.get("result_parser", {})
+        self.results_path_edit.setText(parser.get("results_path", ""))
         self.name_field_edit.setText(parser.get("name_field", ""))
         self.lat_field_edit.setText(parser.get("lat_field", ""))
         self.lon_field_edit.setText(parser.get("lon_field", ""))
@@ -678,6 +728,7 @@ class ProviderEditDialog(QDialog):
             "enabled": self.enabled_checkbox.isChecked(),
             "url_template": self.url_edit.text(),
             "request_method": self.method_combo.currentText(),
+            "post_body": self.post_body_edit.toPlainText().strip(),
             "regex_filter": self.regex_edit.text(),
             "stop_on_result": self.stop_checkbox.isChecked(),
             "headers": {},
@@ -702,6 +753,8 @@ class ProviderEditDialog(QDialog):
                 
         # Parser settings
         parser = {}
+        if self.results_path_edit.text():
+            parser["results_path"] = self.results_path_edit.text()
         if self.name_field_edit.text():
             parser["name_field"] = self.name_field_edit.text()
         if self.lat_field_edit.text():
