@@ -4,38 +4,19 @@ A modern QGIS plugin that adds a powerful configurable search panel to QGIS. Thi
 
 ## Features
 
-### 🔍 **Multi-Source Search**
+### Multi-Source Search
 - Search through multiple API endpoints simultaneously
 - Search within project layers and their features
 - Coordinate-based search with automatic detection
 - Configurable search order and priority
-- **Interactive results list** with clickable items
-- **Persistent results display** - results remain visible after clicking
-- **Loading indicators** with visual feedback during search
 
-### ⚙️ **Advanced Configuration**
+### Advanced Configuration
 - **API Providers**: Add custom API endpoints with URL templates
 - **QGIS Authentication**: Use QGIS authentication configurations for secure API access
 - **Regex Filtering**: Use regular expressions to determine search relevance
 - **Custom Headers**: Support for manual headers alongside authentication
 - **Result Parsing**: Configure how to extract location data from API responses
 - **Search Behavior**: Control search stopping, timeouts, and result limits
-- **Smart Zoom Levels**: Automatic zoom detection based on coordinate system (geographic vs projected)
-
-### 🗺️ **Layer Integration**
-- Search layer names and titles
-- Search within layer features and attributes
-- Automatic zoom to search results with intelligent zoom levels
-- Support for all vector layer types
-
-### 🎯 **Smart Search Behavior**
-- **Stop on First Result**: Optionally stop searching when first relevant result is found
-- **Priority Ordering**: Configure which sources are searched first
-- **Regex Validation**: Only search APIs when input matches specified patterns
-- **Result Limits**: Control maximum results per provider
-- **Interactive Results**: Click individual results to zoom to specific locations
-- **Persistent Results**: Results stay visible for easy exploration of multiple results
-- **Visual Feedback**: Loading indicators and search status updates
 
 ## Installation
 
@@ -50,40 +31,28 @@ A modern QGIS plugin that adds a powerful configurable search panel to QGIS. Thi
 
 ## Usage
 
+### Configuration
+1. Click the configuration button in the toolbar or go to `Plugins > Configurable Search > Configure Search`
+2. [Configure your search providers](#adding-api-providers) in the **API Providers** tab
+3. Adjust layer search settings in the **Layer Search** tab
+4. Set general behavior in the **General Settings** tab
+
 ### Basic Search
 1. After installation, you'll see a search panel that can be docked anywhere in QGIS
 2. Use the "Toggle Search Panel" toolbar button to show/hide the panel
 3. Type your search term and press Enter
-4. A loading indicator will appear showing search progress
-5. A dropdown list will appear showing all matching results
-6. Click on any result to zoom to that location
-7. Results remain visible for easy exploration of multiple locations
-4. Click any result in the list to zoom directly to that location
-5. Close the results list using the "✕ Close" link or start a new search
-
-### Results Interface
-The search results appear in a dropdown list below the search box, showing:
-- **Result name** and source provider
-- **Hover tooltips** with detailed information (coordinates, bounds, etc.)
-- **Visual feedback** during search (yellow background while searching)
-- **Error indication** (red background if search fails)
-- **Result count** in the header
-- **One-click zoom** to any individual result
-- **Smart zoom levels** adapted to coordinate system type
+4. A dropdown list will appear showing all matching results
+5. Click on any result to zoom to that location
 
 ### Zoom Configuration
 The plugin automatically detects your map's coordinate reference system (CRS) and applies appropriate zoom levels:
 - **Geographic CRS** (like WGS84): Uses degree-based buffer (default: 0.001° ≈ 100m)
-- **Projected CRS** (like UTM): Uses meter/feet-based buffer (default: 500 units)
+- **Projected CRS** (like BNG): Uses meter/feet-based buffer (default: 500 units)
 - **Configurable**: Adjust zoom levels in General Settings to suit your needs
 
-### Configuration
-1. Click the configuration button in the toolbar or go to `Plugins > Configurable Search > Configure Search`
-2. Configure your search providers in the **API Providers** tab
-3. Adjust layer search settings in the **Layer Search** tab
-4. Set general behavior in the **General Settings** tab
-
 ### Adding API Providers
+
+Nominatim, Google and Mapbox searches are available as pre-configured templates (bring your own API key for Google and Mapbox) and can be customised. Alternatively, configure any JSON compatible provider using the configuration options.
 
 #### Example: OpenStreetMap Nominatim
 - **Name**: OpenStreetMap Nominatim
@@ -118,22 +87,6 @@ The plugin supports QGIS Authentication Configurations for secure API access, wh
      - Select your authentication configuration from the dropdown
      - Optionally add manual headers that will be merged with auth headers
    - The authentication will be applied automatically to all requests
-
-#### Benefits of QGIS Authentication:
-- **Secure**: Credentials are encrypted and stored securely by QGIS
-- **Reusable**: Same auth config can be used across multiple plugins and data sources
-- **Flexible**: Supports various authentication methods (Basic, Bearer tokens, OAuth2, etc.)
-- **No hardcoding**: Avoid putting sensitive credentials in configuration files
-
-#### Manual Headers vs Authentication:
-- **Authentication Config**: Recommended for credentials and sensitive headers
-- **Manual Headers**: Use for non-sensitive headers like `Content-Type`, `User-Agent`, etc.
-- **Combined**: You can use both - auth config for credentials, manual headers for other needs
-- **Headers**: `{"Authorization": "Bearer YOUR_TOKEN"}`
-- **Result Parser**:
-  - Name Field: `results.0.formatted_address`
-  - Latitude Field: `results.0.geometry.location.lat`
-  - Longitude Field: `results.0.geometry.location.lng`
 
 #### Example: Coordinate Search
 - **Name**: Coordinate Search
@@ -177,13 +130,53 @@ Use dot notation to access nested JSON fields:
 - `results.0.name` - First item in results array
 - `geometry.location.lat` - Nested object access
 
-## Regex Examples
+## Configuration Backup and Sharing
 
-Common regex patterns for search validation:
-- Coordinates: `^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$`
-- Postal codes: `^\d{5}(-\d{4})?$`
-- Phone numbers: `^\+?[\d\s\-\(\)]+$`
-- Email addresses: `^[^\s@]+@[^\s@]+\.[^\s@]+$`
+The plugin supports exporting and importing provider configurations, making it easy to backup your settings and share configurations with colleagues.
+
+### Exporting Configurations
+
+1. **Open Settings**: Click the settings/configuration button in the search panel
+2. **Navigate to Providers**: Go to the "Search Providers" tab
+3. **Export**: Click the "Export..." button
+4. **Choose Location**: Select where to save the JSON export file
+5. **Save**: The file will include all search providers and plugin settings
+
+### Importing Configurations
+
+1. **Open Settings**: Click the settings/configuration button in the search panel
+2. **Navigate to Providers**: Go to the "Search Providers" tab  
+3. **Import**: Click the "Import..." button
+4. **Choose Import Mode**:
+   - **Replace All**: Remove existing providers and replace with imported ones
+   - **Merge**: Add imported providers alongside existing ones (skips duplicates)
+5. **Select File**: Choose the JSON export file to import
+6. **Apply**: New providers will appear in your configuration
+
+### Export File Structure
+
+The export creates a comprehensive JSON file containing:
+
+- **Export Metadata**: Plugin version, export date, and provider count
+- **Search Providers**: Complete provider configurations including:
+  - URL templates and request methods
+  - Authentication headers and API keys
+  - Result parsing rules and field mappings
+  - Regular expression filters
+  - Priority settings and enable/disable state
+- **Plugin Settings**: General preferences like timeouts and zoom behavior
+
+### Use Cases
+
+- **Team Collaboration**: Share standardized API configurations across teams
+- **Backup**: Save configurations before making major changes
+- **Migration**: Transfer settings between QGIS installations or computers
+- **Templates**: Create organization-wide standard configurations
+- **Testing**: Quickly switch between different API provider setups
+
+### Example Export
+
+See `example_export.json` in the plugin directory for a sample export file format that includes common providers like OpenStreetMap Nominatim and Google Places API.
 
 ## Requirements
 
@@ -208,50 +201,18 @@ configurable_search/
 └── README.md                 # This file
 ```
 
-### Building Resources
-To rebuild the resources file after modifying `resources.qrc`:
-```bash
-pyrcc5 -o resources.py resources.qrc
-```
-
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+Our preferred means of receiving contributions is through [pull requests](https://help.github.com/articles/using-pull-requests). Make sure
+that your pull request follows our pull request guidelines below before submitting it.
+
+Before starting work on a feature or issue, make sure you let us know by adding a comment to the relevant issue in the issue tracker.
+
+If you are looking to build new functionality or change something quite significantly, please check with the core developers before starting work to make sure 
+it is something we are happy for you to do.
 
 ## License
 
-This plugin is released under the GPL v3 license. See LICENSE file for details.
+This plugin is released under the MIT license. See LICENSE file for details.
 
-## Support
 
-For issues, feature requests, or questions:
-- Create an issue on GitHub
-- Check the QGIS plugin documentation
-- Visit the QGIS community forums
-
-## Changelog
-
-### Version 1.1.0
-- **New**: Interactive results dropdown list
-- **New**: Click individual results to zoom to specific locations
-- **New**: Visual search feedback (colored search box during search)
-- **New**: Detailed tooltips for each result showing coordinates and bounds
-- **New**: Result count display
-- **New**: Smart zoom levels adapted to coordinate system type
-- **New**: Configurable zoom buffers for geographic and projected CRS
-- **Improved**: Better user experience with non-blocking search results
-- **Improved**: Enhanced result formatting and display
-- **Fixed**: Zoom level now appropriate for different coordinate systems
-
-### Version 1.0.0
-- Initial release
-- Multi-API search support
-- Layer search integration
-- Configurable search providers
-- Regex filtering
-- Custom result parsing
-- Search prioritization
