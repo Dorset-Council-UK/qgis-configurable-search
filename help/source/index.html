@@ -38,7 +38,6 @@
         <li><strong>Multi-Provider Search:</strong> Search through multiple API endpoints simultaneously</li>
         <li><strong>Pre-configured Templates:</strong> Quick setup for popular geocoding services</li>
         <li><strong>Flexible Configuration:</strong> Support for GET/POST requests, custom headers, and authentication</li>
-        <li><strong>Smart Results:</strong> Automatic map zooming and result preview</li>
         <li><strong>Import/Export:</strong> Backup and share configurations</li>
         <li><strong>Regular Expression Filtering:</strong> Fine-tune search results</li>
       </ul>
@@ -111,9 +110,7 @@
       <ul>
         <li><strong>Google Places API:</strong> High-quality place search with detailed information</li>
         <li><strong>Nominatim (OpenStreetMap):</strong> Free geocoding service (no API key required)</li>
-        <li><strong>Google Geocoding API:</strong> Traditional address geocoding</li>
         <li><strong>Mapbox Geocoding:</strong> Fast, customizable search service</li>
-        <li><strong>HERE Geocoding API:</strong> Enterprise-grade geocoding</li>
       </ul>
 
       <h3>Using Templates</h3>
@@ -161,6 +158,30 @@
         <li><strong>Result Parsing:</strong> Configurable JSON path extraction</li>
       </ul>
 
+      <h4>Parsing results</h4>
+      <p>Parsing results from JSON requires JSONPath expressions to extract relevant fields. Use a service like <a href="https://jsonpath.com/">https://jsonpath.com/</a> to help you.</p>
+      <p>There are five fields you can fill in under Result Parsing: </p>
+      <h5>Results Array Path (optional)</h5>
+      <p>This is the path to the array of results. Some services include other metadata about the result set at the top level, and the actual results you want seperately. This parameter lets you specify where those results can be found.</p>
+
+      <h5>Name Path</h5>
+      <p>This is the JSONPath to a field which will be used as the display name for the result, generally a full address field</p>
+
+      <h5>Latitude Path</h5>
+      <p>This is the JSONPath to the field containing the latitude coordinate of the result.</p>
+
+      <h5>Longitude Path</h5>
+      <p>This is the JSONPath to the field containing the longitude coordinate of the result.</p>
+
+      <h5>Bounding Box Field/Template</h5>
+      <p>This is the JSONPath to the field containing the bounding box coordinates of the result.</p>
+      <p>You can either specify a single field that contains the bounding box as an array of coordinates, or you can specify separate fields for the north, south, east, and west coordinates.</p>
+      <ul>
+        <li>Single field: e.g. 'bbox' (if API returns [west,south,east,north])</li>
+        <li>Template: '{west},{south},{east},{north}' or '{minX},{minY},{maxX},{maxY}'</li>
+      </ul>
+      
+      <p><strong>Note: </strong>You must have either the bounding box field or both the latitude and longitude fields filled in for the search to work properly.</p>
       <h3>Authentication</h3>
       <p>
         Multiple authentication methods supported:
@@ -173,12 +194,13 @@
 
       <h3>Regular Expression Filtering</h3>
       <p>
-        Fine-tune search results using regex patterns:
+        Make a search only happen when the search term matches specific patterns, such as:
       </p>
       <ul>
-        <li><strong>Include Patterns:</strong> Only show matching results</li>
-        <li><strong>Exclude Patterns:</strong> Hide unwanted results</li>
-        <li><strong>Coordinate Detection:</strong> Automatic detection of coordinate strings</li>
+        <li>UK Postal codes</li>
+        <li>Reference numbers in your data</li>
+        <li>Coordinate pairs</li>
+        <li>Anything else you can think of!</li>
       </ul>
 
       <h2 id="troubleshooting">Troubleshooting</h2>
