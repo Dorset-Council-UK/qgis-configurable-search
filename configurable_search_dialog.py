@@ -10,6 +10,7 @@ from qgis.PyQt.QtWidgets import (
 from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem
 from qgis.core import QgsProject, QgsVectorLayer, QgsApplication
 from qgis.gui import QgsAuthConfigSelect
+from .provider_templates import get_template_display_names, get_template_by_display_name, apply_template_to_provider
 
 
 class AdvancedSearchPanelDialog(QDialog):
@@ -73,6 +74,9 @@ class AdvancedSearchPanelDialog(QDialog):
         self.providers_table.setModel(self.providers_model)
         self.providers_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         
+        # Connect double-click to edit provider
+        self.providers_table.doubleClicked.connect(self.edit_provider)
+        
         # Make table columns resizable
         header = self.providers_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
@@ -98,9 +102,21 @@ class AdvancedSearchPanelDialog(QDialog):
         self.move_down_button = QPushButton("Move Down")
         self.move_down_button.clicked.connect(self.move_provider_down)
         
+        # Import/Export buttons
+        self.export_providers_button = QPushButton("Export...")
+        self.export_providers_button.clicked.connect(self.export_providers)
+        self.export_providers_button.setToolTip("Export search providers to a file for backup or sharing")
+        
+        self.import_providers_button = QPushButton("Import...")
+        self.import_providers_button.clicked.connect(self.import_providers)
+        self.import_providers_button.setToolTip("Import search providers from a file")
+        
         button_layout.addWidget(self.add_provider_button)
         button_layout.addWidget(self.edit_provider_button)
         button_layout.addWidget(self.remove_provider_button)
+        button_layout.addStretch()
+        button_layout.addWidget(self.export_providers_button)
+        button_layout.addWidget(self.import_providers_button)
         button_layout.addStretch()
         button_layout.addWidget(self.move_up_button)
         button_layout.addWidget(self.move_down_button)
@@ -163,8 +179,7 @@ class AdvancedSearchPanelDialog(QDialog):
     def load_config(self):
         """Load configuration into the UI."""
         # Load providers
-        providers = self.config.get("search_providers", [])
-        self.providers_model.set_providers(providers)
+        self.load_providers()
         
         # Load general settings
         self.stop_on_first_checkbox.setChecked(
@@ -184,6 +199,13 @@ class AdvancedSearchPanelDialog(QDialog):
         self.zoom_projected_spinbox.setValue(
             self.config.get("zoom_buffer_projected", 500)
         )
+    
+    def load_providers(self):
+        """Load providers from config into the UI."""
+        # Refresh config from config manager
+        self.config = self.config_manager.get_config()
+        providers = self.config.get("search_providers", [])
+        self.providers_model.set_providers(providers)
         
         
     def save_config(self):
@@ -210,14 +232,23 @@ class AdvancedSearchPanelDialog(QDialog):
             provider = dialog.get_provider()
             self.providers_model.add_provider(provider)
             
-    def edit_provider(self):
-        """Edit the selected provider."""
-        selected_rows = self.providers_table.selectionModel().selectedRows()
-        if not selected_rows:
-            QMessageBox.information(self, "No Selection", "Please select a provider to edit.")
-            return
-            
-        row = selected_rows[0].row()
+    def edit_provider(self, index=None):
+        """Edit the selected provider.
+        
+        Args:
+            index: QModelIndex from double-click signal (optional)
+        """
+        if index is not None and index.isValid():
+            # Called from double-click with specific index
+            row = index.row()
+        else:
+            # Called from button, get selected row
+            selected_rows = self.providers_table.selectionModel().selectedRows()
+            if not selected_rows:
+                QMessageBox.information(self, "No Selection", "Please select a provider to edit.")
+                return
+            row = selected_rows[0].row()
+        
         provider = self.providers_model.get_provider(row)
         
         dialog = ProviderEditDialog(provider)
@@ -269,6 +300,46 @@ class AdvancedSearchPanelDialog(QDialog):
             self.providers_model.move_provider(row, row + 1)
             # Update selection
             self.providers_table.selectRow(row + 1)
+    
+    def export_providers(self):
+        """Export search providers to a file."""
+        if self.config_manager.export_providers(parent_widget=self):
+            # The export was successful, config_manager already shows success message
+            pass
+    
+    def import_providers(self):
+        """Import search providers from a file."""
+        # Create a custom message box with clear button options
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Import Providers")
+        msg_box.setText("How would you like to import the providers?")
+        msg_box.setInformativeText(
+            "Replace All: Remove existing providers and replace with imported ones\n\n"
+            "Merge: Add imported providers alongside existing ones (skip duplicates)"
+        )
+        
+        # Add custom buttons with clear labels
+        replace_button = msg_box.addButton("Replace All", QMessageBox.AcceptRole)
+        merge_button = msg_box.addButton("Merge", QMessageBox.AcceptRole)
+        cancel_button = msg_box.addButton("Cancel", QMessageBox.RejectRole)
+        
+        msg_box.setDefaultButton(merge_button)
+        msg_box.exec_()
+        
+        clicked_button = msg_box.clickedButton()
+        
+        if clicked_button == cancel_button:
+            return
+        elif clicked_button == replace_button:
+            merge_mode = False
+        elif clicked_button == merge_button:
+            merge_mode = True
+        else:
+            return  # Shouldn't happen, but just in case
+        
+        if self.config_manager.import_providers(parent_widget=self, merge_mode=merge_mode):
+            # Reload the providers in the UI
+            self.load_providers()
             
     def apply_changes(self):
         """Apply changes without closing the dialog."""
@@ -409,7 +480,22 @@ class ProviderEditDialog(QDialog):
         form_layout.addRow("Name:", self.name_edit)
         
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["API", "Coordinate", "Layer"])
+        # Add basic types
+        basic_types = ["API", "Coordinate", "Layer"]
+        # Add separator
+        separator_items = ["--- API Templates ---"]
+        # Add template types
+        template_types = get_template_display_names()
+        
+        all_items = basic_types + separator_items + template_types
+        self.type_combo.addItems(all_items)
+        
+        # Disable the separator item
+        separator_index = basic_types.index("Layer") + 1  # Index after "Layer"
+        model = self.type_combo.model()
+        item = model.item(separator_index)
+        item.setEnabled(False)
+        
         self.type_combo.currentTextChanged.connect(self.on_type_changed)
         form_layout.addRow("Type:", self.type_combo)
         
@@ -611,7 +697,17 @@ class ProviderEditDialog(QDialog):
         
     def on_type_changed(self):
         """Handle provider type change."""
-        provider_type = self.type_combo.currentText().lower()
+        selected_type = self.type_combo.currentText()
+        
+        # Check if this is a template selection
+        template = get_template_by_display_name(selected_type)
+        if template:
+            # This is a template - apply it and show API controls
+            self._apply_template(template)
+            provider_type = "api"  # All templates are API-based
+        else:
+            # This is a basic type
+            provider_type = selected_type.lower()
         
         # Show/hide API-specific controls
         api_visible = provider_type == "api"
@@ -639,6 +735,63 @@ class ProviderEditDialog(QDialog):
         self.search_fields_edit.setVisible(layer_visible)
         self.search_mode_label.setVisible(layer_visible)
         self.search_mode_combo.setVisible(layer_visible)
+        
+    def _apply_template(self, template):
+        """Apply a template configuration to populate the form fields."""
+        # Don't auto-fill name - let user set it
+        # self.name_edit.setText(template.get("name", ""))
+        
+        # Fill URL template
+        self.url_edit.setText(template.get("url_template", ""))
+        
+        # Set HTTP method
+        method = template.get("request_method", "GET")
+        method_index = {"GET": 0, "POST": 1}.get(method, 0)
+        self.method_combo.setCurrentIndex(method_index)
+        
+        # Fill POST body
+        self.post_body_edit.setPlainText(template.get("post_body", ""))
+        
+        # Fill headers
+        headers = template.get("headers", {})
+        if headers:
+            import json
+            self.headers_edit.setPlainText(json.dumps(headers, indent=2))
+        
+        # Fill parser settings
+        parser = template.get("result_parser", {})
+        self.results_path_edit.setText(parser.get("results_path", ""))
+        self.name_field_edit.setText(parser.get("name_field", ""))
+        self.lat_field_edit.setText(parser.get("lat_field", ""))
+        self.lon_field_edit.setText(parser.get("lon_field", ""))
+        self.bbox_field_edit.setText(parser.get("bbox_field", ""))
+        
+        # Fill other settings
+        self.enabled_checkbox.setChecked(template.get("enabled", True))
+        self.regex_edit.setText(template.get("regex_filter", ""))
+        self.stop_checkbox.setChecked(template.get("stop_on_result", False))
+        
+        # Show setup instructions if available
+        instructions = template.get("setup_instructions", [])
+        if instructions:
+            self._show_setup_instructions(template.get("display_name", "Template"), instructions)
+    
+    def _show_setup_instructions(self, template_name, instructions):
+        """Show setup instructions for the selected template."""
+        instruction_text = f"<h3>Setup Instructions for {template_name}</h3>"
+        instruction_text += "<ul>"
+        for instruction in instructions:
+            instruction_text += f"<li>{instruction}</li>"
+        instruction_text += "</ul>"
+        instruction_text += "<p><b>Note:</b> You can customize all settings after applying the template.</p>"
+        
+        msg = QMessageBox()
+        msg.setWindowTitle("Template Applied")
+        msg.setText(f"Template '{template_name}' has been applied to the form.")
+        msg.setDetailedText("Setup Instructions:\n" + "\n".join(instructions))
+        msg.setInformativeText("Please review the configuration and add your API credentials where needed.")
+        msg.setIcon(QMessageBox.Information)
+        msg.exec_()
         
     def on_layer_changed(self):
         """Handle layer selection change to update search fields placeholder."""
@@ -722,9 +875,20 @@ class ProviderEditDialog(QDialog):
         
     def get_provider(self):
         """Get provider data from the form."""
+        selected_type = self.type_combo.currentText()
+        
+        # Determine the actual provider type
+        template = get_template_by_display_name(selected_type)
+        if template:
+            # This is a template - use "api" as the provider type
+            provider_type = "api"
+        else:
+            # This is a basic type
+            provider_type = selected_type.lower()
+        
         provider = {
             "name": self.name_edit.text(),
-            "provider_type": self.type_combo.currentText().lower(),
+            "provider_type": provider_type,
             "enabled": self.enabled_checkbox.isChecked(),
             "url_template": self.url_edit.text(),
             "request_method": self.method_combo.currentText(),

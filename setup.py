@@ -117,7 +117,7 @@ def main():
         install_plugin()
         print("")
         print("Plugin installed successfully!")
-        print("Restart QGIS and enable the plugin in the Plugin Manager.")
+        print("Restart QGIS and enable the plugin in the Plugin Manager or use the Plugin Reloader plugin to see the changes.")
     
     elif command == 'dev':
         build_resources()
