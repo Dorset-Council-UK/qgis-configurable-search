@@ -238,11 +238,12 @@ class AdvancedSearchPanelDialog(QDialog):
         Args:
             index: QModelIndex from double-click signal (optional)
         """
-        if index is not None and index.isValid():
-            # Called from double-click with specific index
+        # Handle different types of index parameter
+        if index is not None and hasattr(index, 'isValid') and index.isValid():
+            # Called from double-click with valid QModelIndex
             row = index.row()
         else:
-            # Called from button, get selected row
+            # Called from button or with invalid/unexpected parameter, get selected row
             selected_rows = self.providers_table.selectionModel().selectedRows()
             if not selected_rows:
                 QMessageBox.information(self, "No Selection", "Please select a provider to edit.")
