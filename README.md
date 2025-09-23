@@ -166,14 +166,6 @@ The export creates a comprehensive JSON file containing:
   - Priority settings and enable/disable state
 - **Plugin Settings**: General preferences like timeouts and zoom behavior
 
-### Use Cases
-
-- **Team Collaboration**: Share standardized API configurations across teams
-- **Backup**: Save configurations before making major changes
-- **Migration**: Transfer settings between QGIS installations or computers
-- **Templates**: Create organization-wide standard configurations
-- **Testing**: Quickly switch between different API provider setups
-
 ### Example Export
 
 See `example_export.json` in the plugin directory for a sample export file format that includes common providers like OpenStreetMap Nominatim and Google Places API.
@@ -188,17 +180,31 @@ See `example_export.json` in the plugin directory for a sample export file forma
 
 ### Project Structure
 ```
-configurable_search/
-├── __init__.py                 # Plugin entry point
-├── configurable_search.py      # Main plugin class
-├── config_manager.py          # Configuration management
-├── search_engine.py           # Search logic and API handling
-├── configurable_search_dialog.py # Configuration dialog
-├── resources.py               # Qt resources
-├── resources.qrc             # Resource file
-├── metadata.txt              # Plugin metadata
-├── icon.svg                  # Plugin icon
-└── README.md                 # This file
+qgis-configurable-search/
+├── __init__.py                      # Plugin entry point
+├── configurable_search.py          # Main plugin class
+├── configurable_search_dialog.py   # Configuration dialog UI
+├── config_manager.py               # Configuration management & import/export
+├── search_engine.py                # Search logic and API handling
+├── provider_templates.py           # Pre-configured API provider templates
+├── resources.py                    # Qt resources (generated)
+├── resources.qrc                   # Resource file definitions
+├── metadata.txt                    # Plugin metadata for QGIS
+├── setup.py                        # Installation script
+├── test_plugin.py                  # Plugin tests
+├── requirements.txt                # Python dependencies
+├── example_export.json             # Sample configuration export
+├── icon.svg                        # Main plugin icon
+├── icon-mono-configure.svg         # Configuration button icon
+├── icon-mono-search.svg            # Search button icon
+├── build.bat                       # Windows build script
+├── build.sh                        # Unix build script
+├── Makefile                        # Build automation
+├── .gitignore                      # Git ignore rules
+├── LICENCE                         # License file
+├── CODE_OF_CONDUCT.md              # Code of conduct
+├── SECURITY.md                     # Security policy
+└── README.md                       # This documentation
 ```
 
 ## Contributing
