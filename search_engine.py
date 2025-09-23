@@ -431,11 +431,13 @@ class SearchEngine(QObject):
             )
 
             # Parse response
-            if response.headers.get('content-type', '').startswith('application/json'):
+            content_type = response.headers.get('content-type', '')
+            if (content_type.startswith('application/json') or 
+                content_type.startswith('application/vnd.geo+json')):
                 return response.json()
             else:
                 QgsMessageLog.logMessage(
-                    f"Non-JSON response from {provider.get('name', 'API')}", 
+                    f"Non-JSON response from {provider.get('name', 'API')}: {content_type}", 
                     "Advanced Search Panel", 
                     Qgis.Warning
                 )
