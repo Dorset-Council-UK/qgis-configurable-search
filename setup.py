@@ -53,12 +53,19 @@ def install_plugin():
         'metadata.txt',
         'README.md',
         'requirements.txt',
-        'resources.qrc'
+        'resources.qrc',
+        'example_export.json'
+    ]
+    
+    # Directories to copy recursively
+    dirs_to_copy = [
+        'help'
     ]
     
     import glob
     copied_files = 0
     
+    # Copy individual files
     for pattern in files_to_copy:
         for file_path in glob.glob(pattern):
             if os.path.isfile(file_path):
@@ -66,8 +73,60 @@ def install_plugin():
                 copied_files += 1
                 print(f"  Copied: {file_path}")
     
+    # Copy directories recursively
+    for dir_name in dirs_to_copy:
+        source_dir = Path(dir_name)
+        if source_dir.exists() and source_dir.is_dir():
+            dest_dir = plugin_dir / dir_name
+            if dest_dir.exists():
+                shutil.rmtree(dest_dir)
+            shutil.copytree(source_dir, dest_dir)
+            print(f"  Copied directory: {dir_name}/")
+            # Count files in directory
+            dir_files = sum(1 for _ in dest_dir.rglob('*') if _.is_file())
+            copied_files += dir_files
+    
     print(f"✓ Plugin installed ({copied_files} files copied)")
     print(f"  Location: {plugin_dir}")
+    return True
+
+
+def verify_installation():
+    """Verify that the plugin is properly installed."""
+    plugin_dir = get_qgis_plugin_dir() / 'advanced_search_panel'
+    
+    if not plugin_dir.exists():
+        print("✗ Plugin directory not found")
+        return False
+    
+    # Check essential files
+    essential_files = [
+        '__init__.py',
+        'configurable_search.py',
+        'metadata.txt'
+    ]
+    
+    missing_files = []
+    for file_name in essential_files:
+        if not (plugin_dir / file_name).exists():
+            missing_files.append(file_name)
+    
+    if missing_files:
+        print(f"✗ Missing essential files: {', '.join(missing_files)}")
+        return False
+    
+    # Check help documentation
+    help_dir = plugin_dir / 'help'
+    if help_dir.exists():
+        help_index = help_dir / 'source' / 'index.html'
+        if help_index.exists():
+            print("✓ Help documentation installed")
+        else:
+            print("⚠ Help directory exists but index.html missing")
+    else:
+        print("⚠ Help documentation not installed")
+    
+    print("✓ Plugin installation verified")
     return True
 
 
@@ -104,6 +163,7 @@ def main():
         print("  python setup.py build       - Build resources")
         print("  python setup.py install     - Install plugin")
         print("  python setup.py dev         - Setup development environment")
+        print("  python setup.py verify      - Verify plugin installation")
         print("  python setup.py info        - Show plugin information")
         return
     
@@ -115,6 +175,7 @@ def main():
     elif command == 'install':
         build_resources()
         install_plugin()
+        verify_installation()
         print("")
         print("Plugin installed successfully!")
         print("Restart QGIS and enable the plugin in the Plugin Manager or use the Plugin Reloader plugin to see the changes.")
@@ -122,10 +183,14 @@ def main():
     elif command == 'dev':
         build_resources()
         create_development_link()
+        verify_installation()
         print("")
         print("Development environment setup complete!")
         print("Changes to the plugin files will be reflected immediately in QGIS.")
         print("Restart QGIS to load the plugin.")
+    
+    elif command == 'verify':
+        verify_installation()
     
     elif command == 'info':
         plugin_dir = get_qgis_plugin_dir()
@@ -136,12 +201,36 @@ def main():
         print(f"Plugin directory: {plugin_dir / 'advanced_search_panel'}")
         print(f"Plugin exists: {(plugin_dir / 'advanced_search_panel').exists()}")
         
-        # Count files
+        # Count files in current directory
         import glob
         py_files = len(glob.glob('*.py'))
         total_files = len(glob.glob('*.*'))
-        print(f"Python files: {py_files}")
-        print(f"Total files: {total_files}")
+        print(f"Source Python files: {py_files}")
+        print(f"Source total files: {total_files}")
+        
+        # Check help documentation
+        help_dir = Path('help')
+        if help_dir.exists():
+            help_files = sum(1 for _ in help_dir.rglob('*') if _.is_file())
+            print(f"Help documentation files: {help_files}")
+        else:
+            print("Help documentation: Not found")
+        
+        # Check installed plugin
+        installed_plugin = plugin_dir / 'advanced_search_panel'
+        if installed_plugin.exists():
+            installed_files = sum(1 for _ in installed_plugin.rglob('*') if _.is_file())
+            print(f"Installed plugin files: {installed_files}")
+            
+            # Check if help is installed
+            installed_help = installed_plugin / 'help'
+            if installed_help.exists():
+                installed_help_files = sum(1 for _ in installed_help.rglob('*') if _.is_file())
+                print(f"Installed help files: {installed_help_files}")
+            else:
+                print("Installed help files: 0 (not installed)")
+        else:
+            print("Installed plugin files: 0 (not installed)")
     
     else:
         print(f"Unknown command: {command}")

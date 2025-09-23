@@ -11,6 +11,8 @@ from .resources import *
 from .configurable_search_dialog import AdvancedSearchPanelDialog
 from .search_engine import SearchEngine
 from .config_manager import ConfigManager
+from . import help
+from . import help
 
 
 class AdvancedSearchPanel:
@@ -148,6 +150,7 @@ class AdvancedSearchPanel:
 
         config_icon_path = os.path.join(self.plugin_dir, 'icon-mono-configure.svg')
         search_icon_path = os.path.join(self.plugin_dir, 'icon-mono-search.svg')
+        help_icon_path = os.path.join(self.plugin_dir, 'icon-mono-help.svg')
         
         # Add configuration action
         self.add_action(
@@ -162,6 +165,14 @@ class AdvancedSearchPanel:
             text=self.tr(u'Toggle Advanced Search Panel'),
             callback=self.toggle_search_panel,
             parent=self.iface.mainWindow())
+            
+        # Add help action
+        self.add_action(
+            help_icon_path,
+            text=self.tr(u'Help'),
+            callback=self.show_help,
+            parent=self.iface.mainWindow(),
+            add_to_toolbar=False)
 
         # Create search dock widget
         self.create_search_widget()
@@ -230,6 +241,10 @@ class AdvancedSearchPanel:
             # Update search widget
             if self.search_widget:
                 self.search_widget.refresh_config()
+    
+    def show_help(self):
+        """Show the plugin help documentation."""
+        help.show_help()
 
 
 class SearchWidget(QWidget):

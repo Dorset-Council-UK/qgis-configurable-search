@@ -194,6 +194,13 @@ qgis-configurable-search/
 ├── test_plugin.py                  # Plugin tests
 ├── requirements.txt                # Python dependencies
 ├── example_export.json             # Sample configuration export
+├── help/                           # Help documentation
+│   ├── source/
+│   │   ├── index.html              # Main help documentation
+│   │   ├── default.css             # Help page styling
+│   │   └── img/                    # Screenshots and images
+│   ├── help.py                     # Help system integration
+│   └── README.md                   # Help documentation guide
 ├── icon.svg                        # Main plugin icon
 ├── icon-mono-configure.svg         # Configuration button icon
 ├── icon-mono-search.svg            # Search button icon

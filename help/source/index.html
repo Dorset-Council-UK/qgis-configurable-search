@@ -1,0 +1,238 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Advanced Search Panel Help</title>
+    <link rel="stylesheet" href="default.css" type="text/css" />
+  </head>
+  <body>
+    <div class="header">
+      <h1>Advanced Search Panel</h1>
+      <h2>User Documentation</h2>
+    </div>
+
+    <div class="content">
+      <h2>Table of Contents</h2>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#installation">Installation</a></li>
+        <li><a href="#getting-started">Getting Started</a></li>
+        <li><a href="#configuration">Configuration</a></li>
+        <li><a href="#templates">API Provider Templates</a></li>
+        <li><a href="#import-export">Import/Export Configuration</a></li>
+        <li><a href="#advanced">Advanced Features</a></li>
+        <li><a href="#troubleshooting">Troubleshooting</a></li>
+      </ul>
+
+      <h2 id="overview">Overview</h2>
+      <p>
+        The Advanced Search Panel is a powerful QGIS plugin that adds configurable search capabilities 
+        to your QGIS interface. It supports multiple API providers, custom search configurations, 
+        and provides a modern dockable search interface.
+      </p>
+
+      <h3>Key Features</h3>
+      <ul>
+        <li><strong>Multi-Provider Search:</strong> Search through multiple API endpoints simultaneously</li>
+        <li><strong>Pre-configured Templates:</strong> Quick setup for popular geocoding services</li>
+        <li><strong>Flexible Configuration:</strong> Support for GET/POST requests, custom headers, and authentication</li>
+        <li><strong>Smart Results:</strong> Automatic map zooming and result preview</li>
+        <li><strong>Import/Export:</strong> Backup and share configurations</li>
+        <li><strong>Regular Expression Filtering:</strong> Fine-tune search results</li>
+      </ul>
+
+      <h2 id="installation">Installation</h2>
+      <p>
+        To install the Advanced Search Panel plugin:
+      </p>
+      <ol>
+        <li>Download the plugin from the QGIS Plugin Repository or from the source repository</li>
+        <li>Extract the plugin to your QGIS plugins directory:
+          <ul>
+            <li><strong>Windows:</strong> <code>%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\</code></li>
+            <li><strong>Linux:</strong> <code>~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/</code></li>
+            <li><strong>macOS:</strong> <code>~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/</code></li>
+          </ul>
+        </li>
+        <li>Restart QGIS</li>
+        <li>Enable the plugin in <strong>Plugins → Manage and Install Plugins</strong></li>
+        <li>The search panel will appear in your QGIS interface</li>
+      </ol>
+
+      <h2 id="getting-started">Getting Started</h2>
+      <p>
+        After installation, you'll see a new search panel in your QGIS interface. The panel can be docked 
+        anywhere in the QGIS window for optimal workflow integration.
+      </p>
+
+      <h3>Basic Usage</h3>
+      <ol>
+        <li><strong>Open Configuration:</strong> Click the gear/settings icon in the search panel</li>
+        <li><strong>Add Provider:</strong> Use a pre-configured template or create a custom provider</li>
+        <li><strong>Search:</strong> Type in the search box and press Enter</li>
+        <li><strong>View Results:</strong> Click on any result to zoom to its location</li>
+      </ol>
+
+      <h2 id="configuration">Configuration</h2>
+      <p>
+        The plugin configuration is accessed through the settings button in the search panel. 
+        The configuration dialog has two main tabs:
+      </p>
+
+      <h3>Search Providers Tab</h3>
+      <p>
+        Configure your search providers including API endpoints, authentication, and result parsing.
+      </p>
+      <ul>
+        <li><strong>Add Provider:</strong> Create new search providers</li>
+        <li><strong>Edit Provider:</strong> Modify existing providers (double-click or use Edit button)</li>
+        <li><strong>Remove Provider:</strong> Delete unwanted providers</li>
+        <li><strong>Reorder:</strong> Change search priority with Move Up/Down buttons</li>
+        <li><strong>Import/Export:</strong> Backup and share configurations</li>
+      </ul>
+
+      <h3>General Settings Tab</h3>
+      <p>
+        Configure global plugin behavior:
+      </p>
+      <ul>
+        <li><strong>Search Behavior:</strong> Stop on first result, result limits, timeouts</li>
+        <li><strong>Zoom Settings:</strong> Configure zoom behavior for different coordinate systems</li>
+      </ul>
+
+      <h2 id="templates">API Provider Templates</h2>
+      <p>
+        The plugin includes pre-configured templates for popular geocoding services:
+      </p>
+
+      <h3>Available Templates</h3>
+      <ul>
+        <li><strong>Google Places API:</strong> High-quality place search with detailed information</li>
+        <li><strong>Nominatim (OpenStreetMap):</strong> Free geocoding service (no API key required)</li>
+        <li><strong>Google Geocoding API:</strong> Traditional address geocoding</li>
+        <li><strong>Mapbox Geocoding:</strong> Fast, customizable search service</li>
+        <li><strong>HERE Geocoding API:</strong> Enterprise-grade geocoding</li>
+      </ul>
+
+      <h3>Using Templates</h3>
+      <ol>
+        <li>Click "Add Provider" in the Search Providers tab</li>
+        <li>Select a template from the "Type" dropdown</li>
+        <li>Follow the setup instructions dialog</li>
+        <li>Add your API credentials where indicated</li>
+        <li>Save and test the configuration</li>
+      </ol>
+
+      <h2 id="import-export">Import/Export Configuration</h2>
+      <p>
+        The plugin supports exporting and importing provider configurations for backup and sharing.
+      </p>
+
+      <h3>Exporting</h3>
+      <ol>
+        <li>Open the configuration dialog</li>
+        <li>Go to the "Search Providers" tab</li>
+        <li>Click the "Export..." button</li>
+        <li>Choose a location to save the JSON file</li>
+      </ol>
+
+      <h3>Importing</h3>
+      <ol>
+        <li>Open the configuration dialog</li>
+        <li>Go to the "Search Providers" tab</li>
+        <li>Click the "Import..." button</li>
+        <li>Choose between "Replace All" or "Merge" mode</li>
+        <li>Select the JSON file to import</li>
+      </ol>
+
+      <h2 id="advanced">Advanced Features</h2>
+
+      <h3>Custom API Providers</h3>
+      <p>
+        Create custom providers for any REST API that returns location data:
+      </p>
+      <ul>
+        <li><strong>URL Templates:</strong> Use <code>{search_term}</code> placeholder</li>
+        <li><strong>HTTP Methods:</strong> Support for GET and POST requests</li>
+        <li><strong>Custom Headers:</strong> Authentication and content type headers</li>
+        <li><strong>POST Body Templates:</strong> JSON body templates with search term substitution</li>
+        <li><strong>Result Parsing:</strong> Configurable JSON path extraction</li>
+      </ul>
+
+      <h3>Authentication</h3>
+      <p>
+        Multiple authentication methods supported:
+      </p>
+      <ul>
+        <li><strong>API Keys:</strong> In headers or URL parameters</li>
+        <li><strong>QGIS Authentication:</strong> Use QGIS authentication configuration system</li>
+        <li><strong>Custom Headers:</strong> Any authentication method supported by the API</li>
+      </ul>
+
+      <h3>Regular Expression Filtering</h3>
+      <p>
+        Fine-tune search results using regex patterns:
+      </p>
+      <ul>
+        <li><strong>Include Patterns:</strong> Only show matching results</li>
+        <li><strong>Exclude Patterns:</strong> Hide unwanted results</li>
+        <li><strong>Coordinate Detection:</strong> Automatic detection of coordinate strings</li>
+      </ul>
+
+      <h2 id="troubleshooting">Troubleshooting</h2>
+
+      <h3>Common Issues</h3>
+
+      <h4>No Search Results</h4>
+      <ul>
+        <li>Check API key configuration</li>
+        <li>Verify internet connection</li>
+        <li>Check provider is enabled</li>
+        <li>Review QGIS logs for errors</li>
+      </ul>
+
+      <h4>Authentication Errors</h4>
+      <ul>
+        <li>Verify API key is correct and active</li>
+        <li>Check quota limits on API account</li>
+        <li>Ensure required services are enabled</li>
+        <li>Verify header format and values</li>
+      </ul>
+
+      <h4>Parsing Errors</h4>
+      <ul>
+        <li>Check Results Path configuration</li>
+        <li>Verify field mapping names match API response</li>
+        <li>Test with simple search terms first</li>
+        <li>Compare API response format with configuration</li>
+      </ul>
+
+      <h3>Debug Information</h3>
+      <p>
+        Enable debug logging in QGIS settings to see:
+      </p>
+      <ul>
+        <li>API request details</li>
+        <li>Response content</li>
+        <li>Parsing steps</li>
+        <li>Error messages</li>
+      </ul>
+
+      <h3>Getting Help</h3>
+      <p>
+        For additional support:
+      </p>
+      <ul>
+        <li>Check the plugin's GitHub repository for issues and documentation</li>
+        <li>Review API provider documentation for service-specific help</li>
+        <li>Consult QGIS community forums for general plugin support</li>
+      </ul>
+    </div>
+
+    <div class="footer">
+      <p>Advanced Search Panel v1.0.0 | QGIS Plugin Documentation</p>
+    </div>
+  </body>
+</html>
