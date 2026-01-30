@@ -1,6 +1,6 @@
-# Configurable Search QGIS Plugin
+# Advanced Search Panel QGIS Plugin
 
-A modern QGIS plugin that adds a powerful configurable search panel to QGIS. This plugin provides a dockable search interface that allows users to search through multiple APIs and project layers with customizable templates, ordering, and regex filtering.
+A modern QGIS plugin that adds a powerful and highly configurable search panel to QGIS. This plugin provides a dockable search interface that allows users to search through multiple APIs and project layers with customizable templates, ordering, and regex filtering.
 
 ## Features
 
@@ -18,16 +18,16 @@ A modern QGIS plugin that adds a powerful configurable search panel to QGIS. Thi
 - **Result Parsing**: Configure how to extract location data from API responses
 - **Search Behavior**: Control search stopping, timeouts, and result limits
 
+## Rationale and alternatives
+There are a number of plugins available that integrate with existing geocoding APIs, but they were all designed to work with specific APIs (such as Google Places, Mapbox, Nominatim etc.), there was nothing out there that allowed you to "bring your own" services. We needed to allow our users to search our own in-house API, so we built a search that allows you to configure pretty much any Web API (as well as Coordinate and Layer searches) and choose exactly how you want it to work.
+
 ## Installation
 
-1. Download or clone this repository to your QGIS plugins directory:
-   - Windows: `%APPDATA%\QGIS\QGIS3\profiles\default\python\plugins\`
-   - Linux: `~/.local/share/QGIS/QGIS3/profiles/default/python/plugins/`
-   - macOS: `~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/`
+__This plugin is awaiting publishing and approval, instructions below will be valid once published and approved__
 
-2. Rename the folder to `configurable_search`
+You can install the latest stable version from the QGIS Plugins repository by going to Plugins - Manage and Install Plugins and searching for 'Advanced Search Panel'. 
 
-3. Start QGIS and enable the plugin in the Plugin Manager
+[Advanced Search Panel on QGIS Plugins website](https://plugins.qgis.org/plugins/)
 
 ## Usage
 
@@ -41,7 +41,7 @@ A modern QGIS plugin that adds a powerful configurable search panel to QGIS. Thi
 1. After installation, you'll see a search panel that can be docked anywhere in QGIS
 2. Use the "Toggle Search Panel" toolbar button to show/hide the panel
 3. Type your search term and press Enter
-4. A dropdown list will appear showing all matching results
+4. A list will appear showing all matching results
 5. Click on any result to zoom to that location
 
 ### Zoom Configuration
@@ -68,6 +68,10 @@ Nominatim, Google and Mapbox searches are available as pre-configured templates 
 - **Name**: My Geocoder
 - **Type**: API
 - **URL Template**: `https://api.example.com/geocode?query={search_term}&key=YOUR_API_KEY`
+- **Result Parser**:
+  - Name Field: `your_display_name_field`
+  - Latitude Field: `latitude`
+  - Longitude Field: `longitude`
 
 ### Using QGIS Authentication
 
@@ -178,54 +182,12 @@ See `example_export.json` in the plugin directory for a sample export file forma
 
 ## Development
 
-### Project Structure
-```
-qgis-configurable-search/
-├── __init__.py                      # Plugin entry point
-├── configurable_search.py          # Main plugin class
-├── configurable_search_dialog.py   # Configuration dialog UI
-├── config_manager.py               # Configuration management & import/export
-├── search_engine.py                # Search logic and API handling
-├── provider_templates.py           # Pre-configured API provider templates
-├── resources.py                    # Qt resources (generated)
-├── resources.qrc                   # Resource file definitions
-├── metadata.txt                    # Plugin metadata for QGIS
-├── setup.py                        # Installation script
-├── test_plugin.py                  # Plugin tests
-├── requirements.txt                # Python dependencies
-├── example_export.json             # Sample configuration export
-├── help/                           # Help documentation
-│   ├── source/
-│   │   ├── index.html              # Main help documentation
-│   │   ├── default.css             # Help page styling
-│   │   └── img/                    # Screenshots and images
-│   ├── help.py                     # Help system integration
-│   └── README.md                   # Help documentation guide
-├── icon.svg                        # Main plugin icon
-├── icon-mono-configure.svg         # Configuration button icon
-├── icon-mono-search.svg            # Search button icon
-├── build.bat                       # Windows build script
-├── build.sh                        # Unix build script
-├── Makefile                        # Build automation
-├── .gitignore                      # Git ignore rules
-├── LICENCE                         # License file
-├── CODE_OF_CONDUCT.md              # Code of conduct
-├── SECURITY.md                     # Security policy
-└── README.md                       # This documentation
-```
+See [DEVELOPING.md](https://github.com/Dorset-Council-UK/qgis-configurable-search/blob/main/DEVELOPING.md)
 
 ## Contributing
 
-Our preferred means of receiving contributions is through [pull requests](https://help.github.com/articles/using-pull-requests). Make sure
-that your pull request follows our pull request guidelines below before submitting it.
-
-Before starting work on a feature or issue, make sure you let us know by adding a comment to the relevant issue in the issue tracker.
-
-If you are looking to build new functionality or change something quite significantly, please check with the core developers before starting work to make sure 
-it is something we are happy for you to do.
+See [CONTRIBUTING.md](https://github.com/Dorset-Council-UK/qgis-configurable-search/blob/main/CONTRIBUTING.md)
 
 ## License
 
-This plugin is released under the MIT license. See LICENSE file for details.
-
-
+This plugin is released under the MIT license. See [LICENSE](https://github.com/Dorset-Council-UK/qgis-configurable-search/blob/main/LICENCE) file for details.
