@@ -96,6 +96,75 @@ class ConfigManager:
         current_providers = self.get_search_providers()
         if not current_providers:
             self.save_search_providers(default_providers)
+
+    def import_project_providers(self):
+        """Import search providers from the current QGIS project properties.
+        
+        Reads the 'search_providers' custom property from the project and loads it
+        into the project_providers instance variable without saving to global settings.
+        """
+        try:
+            project = QgsProject.instance()
+            
+            # Read the custom property from the project
+            # readEntry returns a tuple: (value, ok)
+            search_providers_json, ok = project.readEntry("AdvancedSearchPanel", "search_providers", "")
+            
+            if not ok or not search_providers_json:
+                # Setting not found or empty, set to None
+                QgsMessageLog.logMessage(
+                    "No search_providers found in project properties",
+                    "Advanced Search Panel",
+                    Qgis.Info
+                )
+                self.project_providers = None
+                return None
+            
+            # Parse the JSON array
+            import_data = json.loads(search_providers_json)
+            
+            # Validate import data structure
+            if not isinstance(import_data, list):
+                # Check if it's a dict with search_providers key (exported format)
+                if isinstance(import_data, dict) and "search_providers" in import_data:
+                    providers_to_import = import_data["search_providers"]
+                else:
+                    raise ValueError("Invalid format: expected JSON array or export format")
+            else:
+                providers_to_import = import_data
+            
+            if not isinstance(providers_to_import, list):
+                raise ValueError("Invalid providers data: expected list of provider configurations")
+            
+            # Validate each provider
+            for i, provider in enumerate(providers_to_import):
+                if not isinstance(provider, dict):
+                    raise ValueError(f"Invalid provider at index {i}: expected object")
+                if "name" not in provider:
+                    raise ValueError(f"Invalid provider at index {i}: missing 'name' field")
+            
+            # Store in instance variable without merging or replacing global config
+            final_providers = providers_to_import
+            
+            QgsMessageLog.logMessage(
+                f"Loaded {len(final_providers)} search provider(s) from project properties",
+                "Advanced Search Panel",
+                Qgis.Info
+            )
+            
+            return final_providers
+            
+        except json.JSONDecodeError as e:
+            error_msg = f"Failed to parse project search_providers JSON: {str(e)}"
+            QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
+            self.project_providers = None
+            return False
+            
+        except Exception as e:
+            error_msg = f"Failed to import project search providers: {str(e)}"
+            QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
+            self.project_providers = None
+            return False
     
     def export_providers(self, file_path=None, parent_widget=None):
         """Export search providers to a JSON file."""

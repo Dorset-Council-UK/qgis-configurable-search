@@ -2,7 +2,7 @@
 name=Advanced Search Panel
 qgisMinimumVersion=3.16
 description=An advanced search panel with interactive results list that searches through APIs and layers. Features QGIS Authentication support, customizable ordering, and regex filtering
-version=1.0.0
+version=1.1.0
 author=Dorset Council
 email=gis@dorsetcouncil.gov.uk
 

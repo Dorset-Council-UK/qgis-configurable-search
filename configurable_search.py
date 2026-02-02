@@ -47,6 +47,9 @@ class AdvancedSearchPanel:
             self.translator.load(locale_path)
             QCoreApplication.installTranslator(self.translator)
 
+        # Setup project providers
+        self.project_providers = None
+
         # Declare instance attributes
         self.actions = []
         self.menu = self.tr(u'&Advanced Search Panel')
@@ -177,8 +180,52 @@ class AdvancedSearchPanel:
         # Create search dock widget
         self.create_search_widget()
         
+        # Connect to project signals for loading project-specific providers
+        QgsProject.instance().readProject.connect(self.on_project_read)
+        QgsProject.instance().cleared.connect(self.on_project_cleared)
+        
+        # Load project providers if a project is already loaded
+        self.on_project_read()
+        
         # will be set False in run()
         self.first_start = True
+
+    def on_project_read(self):
+        """Handle project read event - load project-specific search providers."""
+        try:
+            # Import providers from project properties
+            providers = self.config_manager.import_project_providers()
+            
+            if providers:
+                self.project_providers = providers
+                QgsMessageLog.logMessage(
+                    f"Loaded {len(providers)} search provider(s) from project",
+                    "Advanced Search Panel",
+                    Qgis.Info
+                )
+            else:
+                self.project_providers = None
+                QgsMessageLog.logMessage(
+                    "No project-specific search providers found",
+                    "Advanced Search Panel",
+                    Qgis.Info
+                )
+        except Exception as e:
+            QgsMessageLog.logMessage(
+                f"Error loading project providers: {str(e)}",
+                "Advanced Search Panel",
+                Qgis.Warning
+            )
+            self.project_providers = None
+    
+    def on_project_cleared(self):
+        """Handle project cleared event - clear project-specific search providers."""
+        self.project_providers = None
+        QgsMessageLog.logMessage(
+            "Project cleared - removed project-specific search providers",
+            "Advanced Search Panel",
+            Qgis.Info
+        )
 
     def create_search_widget(self):
         """Create the search dock widget panel."""
@@ -207,6 +254,13 @@ class AdvancedSearchPanel:
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
+        # Disconnect project signals
+        try:
+            QgsProject.instance().readProject.disconnect(self.on_project_read)
+            QgsProject.instance().cleared.disconnect(self.on_project_cleared)
+        except:
+            pass
+        
         for action in self.actions:
             self.iface.removePluginMenu(
                 self.tr(u'&Advanced Search Panel'),
