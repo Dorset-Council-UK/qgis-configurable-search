@@ -258,7 +258,7 @@ class AdvancedSearchPanel:
         try:
             QgsProject.instance().readProject.disconnect(self.on_project_read)
             QgsProject.instance().cleared.disconnect(self.on_project_cleared)
-        except:
+        except Exception:
             pass
         
         for action in self.actions:
