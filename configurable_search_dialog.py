@@ -155,7 +155,7 @@ class AdvancedSearchPanelDialog(QDialog):
         is_project_provider = provider.get("_source") == "project" if provider else False
         self.edit_provider_button.setEnabled(not is_project_provider)
         self.remove_provider_button.setEnabled(not is_project_provider)
-        if is_project_provider: 
+        if is_project_provider:
             self.project_info_label.show()
         else:
             self.project_info_label.hide()
