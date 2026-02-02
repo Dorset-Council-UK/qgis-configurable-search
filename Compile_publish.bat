@@ -1,10 +1,12 @@
 @echo off
 cd %~dp0
 
-call "C:\PROGRA~1\QGIS_3\bin\o4w_env.bat"
+REM Configure QGIS installation root (can be overridden by pre-setting QGIS_ROOT)
+if not defined QGIS_ROOT set "QGIS_ROOT=C:\PROGRA~1\QGIS_3"
 
-set PYTHONPATH=C:\PROGRA~1\QGIS_3\apps\Python312\Scripts;%PYTHONPATH%
+call "%QGIS_ROOT%\bin\o4w_env.bat"
 
+set PYTHONPATH=%QGIS_ROOT%\apps\Python312\Scripts;%PYTHONPATH%
 REM Prompt user for QGIS profile
 echo.
 echo Available QGIS profiles (common options):
