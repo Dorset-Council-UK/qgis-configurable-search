@@ -202,9 +202,8 @@ class AdvancedSearchPanelDialog(QDialog):
     
     def load_providers(self):
         """Load providers from config into the UI."""
-        # Refresh config from config manager
-        self.config = self.config_manager.get_config()
-        providers = self.config.get("search_providers", [])
+        # Get merged providers (project + global)
+        providers = self.config_manager.get_search_providers()
         self.providers_model.set_providers(providers)
         
         

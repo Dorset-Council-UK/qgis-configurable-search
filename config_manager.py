@@ -20,6 +20,7 @@ class ConfigManager:
             "zoom_buffer_geographic": 0.001,  # Buffer for geographic CRS (degrees)
             "zoom_buffer_projected": 100      # Buffer for projected CRS (meters/feet)
         }
+        self.project_providers = None  # To hold project-specific providers if imported
         
     def get_config(self):
         """Get the complete configuration."""
@@ -39,7 +40,14 @@ class ConfigManager:
     def get_search_providers(self):
         """Get the list of search providers."""
         config = self.get_config()
-        return config.get("search_providers", [])
+        global_providers = config.get("search_providers", [])
+
+        # If no project providers, return global only
+        if self.project_providers is None:
+            return global_providers
+
+        # Merge project-specific providers with global ones
+        return self.project_providers + global_providers
     
     def save_search_providers(self, providers):
         """Save the list of search providers."""
@@ -118,7 +126,7 @@ class ConfigManager:
                     Qgis.Info
                 )
                 self.project_providers = None
-                return None
+                return False
             
             # Parse the JSON array
             import_data = json.loads(search_providers_json)
@@ -145,14 +153,15 @@ class ConfigManager:
             
             # Store in instance variable without merging or replacing global config
             final_providers = providers_to_import
-            
+            self.project_providers = final_providers
+
             QgsMessageLog.logMessage(
                 f"Found {len(final_providers)} search provider(s) from project properties",
                 "Advanced Search Panel",
                 Qgis.Info
             )
             
-            return final_providers
+            return True
             
         except json.JSONDecodeError as e:
             error_msg = f"Failed to parse project search_providers JSON: {str(e)}"
@@ -165,6 +174,15 @@ class ConfigManager:
             QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
             self.project_providers = None
             return False
+
+    def clear_project_providers(self):
+        """Handle project cleared event - clear project-specific search providers."""
+        self.project_providers = None
+        QgsMessageLog.logMessage(
+            "Project cleared - removed project-specific search providers",
+            "Advanced Search Panel",
+            Qgis.Info
+        )
     
     def export_providers(self, file_path=None, parent_widget=None):
         """Export search providers to a JSON file."""
