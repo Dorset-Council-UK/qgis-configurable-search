@@ -144,6 +144,13 @@ class ConfigManager:
                 self.project_providers = None
                 return False
             
+            # Validate that the variable is a string (expected for JSON data)
+            if not isinstance(search_providers_json, str):
+                error_msg = f"Invalid search_providers variable type: expected string, got {type(search_providers_json).__name__}"
+                QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
+                self.project_providers = None
+                return False
+            
             # Parse the JSON array
             import_data = json.loads(search_providers_json)
             
@@ -184,9 +191,21 @@ class ConfigManager:
             QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
             self.project_providers = None
             return False
+        
+        except TypeError as e:
+            error_msg = f"Type error when processing project search_providers: {str(e)}"
+            QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
+            self.project_providers = None
+            return False
+        
+        except ValueError as e:
+            error_msg = f"Invalid data format in project search_providers: {str(e)}"
+            QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
+            self.project_providers = None
+            return False
             
         except Exception as e:
-            error_msg = f"Failed to import project search providers: {str(e)}"
+            error_msg = f"Unexpected error importing project search providers: {str(e)}"
             QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
             self.project_providers = None
             return False
