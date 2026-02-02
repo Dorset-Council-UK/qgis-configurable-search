@@ -21,6 +21,7 @@
         <li><a href="#getting-started">Getting Started</a></li>
         <li><a href="#configuration">Configuration</a></li>
         <li><a href="#templates">API Provider Templates</a></li>
+        <li><a href="#layer-providers">Layer-Based Providers</a></li>
         <li><a href="#import-export">Import/Export Configuration</a></li>
         <li><a href="#advanced">Advanced Features</a></li>
         <li><a href="#troubleshooting">Troubleshooting</a></li>
@@ -36,6 +37,7 @@
       <h3>Key Features</h3>
       <ul>
         <li><strong>Multi-Provider Search:</strong> Search through multiple API endpoints simultaneously</li>
+        <li><strong>Layer-Based Search:</strong> Search within your project layers and feature attributes</li>
         <li><strong>Pre-configured Templates:</strong> Quick setup for popular geocoding services</li>
         <li><strong>Flexible Configuration:</strong> Support for GET/POST requests, custom headers, and authentication</li>
         <li><strong>Import/Export:</strong> Backup and share configurations</li>
@@ -122,6 +124,226 @@
         <li>Save and test the configuration</li>
       </ol>
 
+      <h2 id="layer-providers">Layer-Based Providers</h2>
+      <p>
+        Layer-based providers allow you to search within the features of layers loaded in your QGIS project. 
+        This is useful for searching local datasets, databases, or any other layer data without requiring an external API.
+      </p>
+
+      <h3>Setting Up a Layer Provider</h3>
+      <ol>
+        <li>Click "Add Provider" in the Search Providers tab</li>
+        <li>Select "Layer" from the "Type" dropdown</li>
+        <li>Give your provider a descriptive name (e.g., "Address Points", "Property Database")</li>
+        <li>Select the layer you want to search from the "Layer" dropdown</li>
+        <li>Configure the search fields and match mode (see below)</li>
+        <li>Optionally add a Regex Filter to control when this provider activates</li>
+        <li>Save the configuration</li>
+      </ol>
+
+      <h3>Search Fields</h3>
+      <p>
+        The <strong>Search Fields</strong> input specifies which attribute fields in your layer should be searched. 
+        You can specify multiple fields separated by commas.
+      </p>
+      <p><strong>Examples:</strong></p>
+      <ul>
+        <li><code>name</code> - Search only the "name" field</li>
+        <li><code>address,street_name,postcode</code> - Search across multiple fields</li>
+        <li><code>reference_number,uprn</code> - Search identifiers</li>
+      </ul>
+      <p>
+        When multiple fields are specified, the search will return results if the search term is found in 
+        <strong>any</strong> of the fields (OR logic).
+      </p>
+
+      <h3>Search Mode: Wildcard vs Exact Match</h3>
+      <p>
+        The search mode determines how your search term is matched against the field values:
+      </p>
+
+      <h4>Wildcard Match (Default)</h4>
+      <p>
+        <strong>Wildcard Match</strong> performs a case-insensitive "contains" search. The search term can appear 
+        <strong>anywhere</strong> within the field value - at the beginning, middle, or end.
+      </p>
+      <ul>
+        <li><strong>Search term:</strong> <code>oak</code></li>
+        <li><strong>Will match:</strong>
+          <ul>
+            <li>"<strong>Oak</strong> Street" (beginning)</li>
+            <li>"123 <strong>Oak</strong>land Drive" (middle)</li>
+            <li>"Royal <strong>Oak</strong>" (end)</li>
+            <li>"The Grand <strong>Oak</strong> Hotel" (middle)</li>
+          </ul>
+        </li>
+        <li><strong>Won't match:</strong> "Maple Avenue"</li>
+      </ul>
+      <p>
+        <strong>Technical detail:</strong> Uses SQL <code>ILIKE '%search_term%'</code> - the <code>%</code> wildcards 
+        match any characters before and after the search term.
+      </p>
+      <p>
+        <strong>Use wildcard match when:</strong>
+      </p>
+      <ul>
+        <li>Users might search for partial addresses or names</li>
+        <li>You want flexible, forgiving search behavior</li>
+        <li>Searching text fields with variable content</li>
+        <li>Users don't know the exact spelling or full value</li>
+      </ul>
+
+      <h4>Exact Match</h4>
+      <p>
+        <strong>Exact Match</strong> performs a case-insensitive comparison where the search term must match 
+        the entire field value exactly (ignoring case).
+      </p>
+      <ul>
+        <li><strong>Search term:</strong> <code>high street</code></li>
+        <li><strong>Will match:</strong>
+          <ul>
+            <li>"High Street"</li>
+            <li>"HIGH STREET"</li>
+            <li>"high street"</li>
+          </ul>
+        </li>
+        <li><strong>Won't match:</strong>
+          <ul>
+            <li>"High Street North" (extra text)</li>
+            <li>"123 High Street" (extra text)</li>
+            <li>"Highland Road" (different text)</li>
+          </ul>
+        </li>
+      </ul>
+      <p>
+        <strong>Use exact match when:</strong>
+      </p>
+      <ul>
+        <li>Searching for unique identifiers (IDs, reference numbers, UPRNs)</li>
+        <li>Field values are standardized and complete</li>
+        <li>You want to prevent partial matches from cluttering results</li>
+        <li>Searching categorical fields with discrete values</li>
+        <li>Searching date fields where you want an exact date match</li>
+      </ul>
+
+      <h3>Using Regex Filters with Layer Providers</h3>
+      <p>
+        The <strong>Regex Filter</strong> field controls <em>when a provider is activated</em>, not how results are matched. 
+        If specified, the search term must match the regex pattern for the provider to run at all.
+      </p>
+      <p>
+        This is useful for creating specialized providers that only activate for specific types of input.
+      </p>
+
+      <h4>Regex Filter Examples</h4>
+      
+      <h5>UK Postcode Search Only</h5>
+      <ul>
+        <li><strong>Regex Filter:</strong> <code>^[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}$</code></li>
+        <li><strong>Activates for:</strong> "BH1 1AA", "SW1A 1AA", "M1 1AE"</li>
+        <li><strong>Ignores:</strong> "High Street", "123", regular text searches</li>
+      </ul>
+      <p>
+        Use this to create a dedicated postcode search provider that only runs when the user enters a valid UK postcode format.
+      </p>
+
+      <h5>Numeric Reference Number Only</h5>
+      <ul>
+        <li><strong>Regex Filter:</strong> <code>^\d{6,10}$</code></li>
+        <li><strong>Activates for:</strong> "123456", "1234567890"</li>
+        <li><strong>Ignores:</strong> "Oak Street", "abc123", any text</li>
+      </ul>
+      <p>
+        Use this for searching property reference numbers or UPRNs without triggering on address searches.
+      </p>
+
+      <h5>Date Format Search (YYYY-MM-DD)</h5>
+      <ul>
+        <li><strong>Regex Filter:</strong> <code>^\d{4}-\d{2}-\d{2}$</code></li>
+        <li><strong>Activates for:</strong> "2024-01-15", "2023-12-31"</li>
+        <li><strong>Ignores:</strong> "15/01/2024", "January 15", any other format</li>
+      </ul>
+      <p>
+        Use this with <strong>exact match mode</strong> to find features with a specific date value.
+      </p>
+
+      <h3>Layer Provider Examples</h3>
+
+      <h4>Example 1: Address Search with Wildcard</h4>
+      <ul>
+        <li><strong>Name:</strong> "Address Lookup"</li>
+        <li><strong>Type:</strong> Layer</li>
+        <li><strong>Layer:</strong> "Property_Addresses"</li>
+        <li><strong>Search Fields:</strong> <code>full_address,street_name</code></li>
+        <li><strong>Search Mode:</strong> Wildcard</li>
+        <li><strong>Regex Filter:</strong> (leave empty - allows any search)</li>
+      </ul>
+      <p>
+        This configuration allows users to search for partial addresses. Searching "oak" would find 
+        "Oak Avenue", "123 Oakland Drive", "Royal Oak Court", etc.
+      </p>
+
+      <h4>Example 2: Property Reference Search with Exact Match</h4>
+      <ul>
+        <li><strong>Name:</strong> "Property ID Search"</li>
+        <li><strong>Type:</strong> Layer</li>
+        <li><strong>Layer:</strong> "Property_Database"</li>
+        <li><strong>Search Fields:</strong> <code>uprn,reference_number</code></li>
+        <li><strong>Search Mode:</strong> Exact</li>
+        <li><strong>Regex Filter:</strong> <code>^\d{6,12}$</code></li>
+      </ul>
+      <p>
+        This configuration only activates when the user enters a 6-12 digit number, and requires an exact match. 
+        Perfect for unique property identifiers.
+      </p>
+
+      <h4>Example 3: Postcode-Only Search</h4>
+      <ul>
+        <li><strong>Name:</strong> "UK Postcode Search"</li>
+        <li><strong>Type:</strong> Layer</li>
+        <li><strong>Layer:</strong> "Addresses"</li>
+        <li><strong>Search Fields:</strong> <code>postcode</code></li>
+        <li><strong>Search Mode:</strong> Exact</li>
+        <li><strong>Regex Filter:</strong> <code>^[A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2}$</code></li>
+      </ul>
+      <p>
+        This provider only activates for valid UK postcode formats and requires an exact match. 
+        Prevents the postcode provider from running on general address searches.
+      </p>
+
+      <h4>Example 4: Date Search</h4>
+      <ul>
+        <li><strong>Name:</strong> "Planning Application by Date"</li>
+        <li><strong>Type:</strong> Layer</li>
+        <li><strong>Layer:</strong> "Planning_Applications"</li>
+        <li><strong>Search Fields:</strong> <code>submission_date,decision_date</code></li>
+        <li><strong>Search Mode:</strong> Exact</li>
+        <li><strong>Regex Filter:</strong> <code>^\d{4}-\d{2}-\d{2}$</code></li>
+      </ul>
+      <p>
+        This searches for planning applications submitted or decided on a specific date. 
+        Users must enter dates in YYYY-MM-DD format (e.g., "2024-01-15").
+      </p>
+      <p>
+        <strong>Note:</strong> The current implementation only supports searching for exact date matches, 
+        not date ranges (e.g., "after 2024-01-01"). For date range queries, you would need to use 
+        QGIS's built-in attribute table filtering or create a custom query.
+      </p>
+
+      <h3>Performance Considerations</h3>
+      <p>
+        When working with large layers, consider these tips:
+      </p>
+      <ul>
+        <li><strong>Limit search fields:</strong> Only include fields that users need to search</li>
+        <li><strong>Use exact match for IDs:</strong> Reduces the number of features that need to be checked</li>
+        <li><strong>Add regex filters:</strong> Prevent searches from running on inappropriate terms</li>
+        <li><strong>Enable spatial indexing:</strong> Ensure your layer has a spatial index for better performance</li>
+        <li><strong>Use the "Stop on Result" option:</strong> Prevent unnecessary searches once a match is found</li>
+        <li><strong>Consider multiple specialized providers:</strong> Instead of one general provider, create specific providers 
+        for postcodes, references, addresses, etc., each with appropriate regex filters</li>
+      </ul>
+
       <h2 id="import-export">Import/Export Configuration</h2>
       <p>
         The plugin supports exporting and importing provider configurations for backup and sharing.
@@ -143,6 +365,10 @@
         <li>Choose between "Replace All" or "Merge" mode</li>
         <li>Select the JSON file to import</li>
       </ol>
+
+      <p><strong>Note:</strong> Layer-based providers in exported configurations reference layers by ID. 
+      When importing on another system, ensure the referenced layers exist in the target project or the 
+      layer provider will need to be reconfigured.</p>
 
       <h2 id="advanced">Advanced Features</h2>
 
@@ -200,8 +426,13 @@
         <li>UK Postal codes</li>
         <li>Reference numbers in your data</li>
         <li>Coordinate pairs</li>
+        <li>Date formats</li>
         <li>Anything else you can think of!</li>
       </ul>
+      <p>
+        <strong>Important:</strong> The regex filter validates the <em>search term</em> (what the user types), 
+        not the feature data in your layer. Use it to control which provider activates based on user input.
+      </p>
 
       <h2 id="troubleshooting">Troubleshooting</h2>
 
@@ -212,6 +443,8 @@
         <li>Check API key configuration</li>
         <li>Verify internet connection</li>
         <li>Check provider is enabled</li>
+        <li>For layer providers: verify the layer is loaded and field names are correct</li>
+        <li>For regex filters: ensure your search term matches the pattern</li>
         <li>Review QGIS logs for errors</li>
       </ul>
 
@@ -231,6 +464,25 @@
         <li>Compare API response format with configuration</li>
       </ul>
 
+      <h4>Layer Provider Issues</h4>
+      <ul>
+        <li>Verify the layer is loaded in the current QGIS project</li>
+        <li>Check that field names in "Search Fields" exactly match layer attribute names (case-sensitive)</li>
+        <li>Ensure the layer has features and isn't empty</li>
+        <li>Try both wildcard and exact match modes to diagnose the issue</li>
+        <li>Check for special characters in field values that might affect matching</li>
+        <li>If using a regex filter, test your pattern at <a href="https://regex101.com/">regex101.com</a></li>
+        <li>Remember: wildcard matches anywhere in the text (beginning, middle, or end)</li>
+      </ul>
+
+      <h4>Regex Filter Not Working</h4>
+      <ul>
+        <li>Test your regex pattern using online tools like <a href="https://regex101.com/">regex101.com</a></li>
+        <li>Remember to escape special characters (e.g., use <code>\.</code> for a literal period)</li>
+        <li>Use <code>^</code> and <code>$</code> anchors to match the entire search term</li>
+        <li>Regex patterns are case-sensitive unless you use flags like <code>(?i)</code></li>
+      </ul>
+
       <h3>Debug Information</h3>
       <p>
         Enable debug logging in QGIS settings to see:
@@ -239,6 +491,8 @@
         <li>API request details</li>
         <li>Response content</li>
         <li>Parsing steps</li>
+        <li>Layer query expressions</li>
+        <li>Regex filter matching results</li>
         <li>Error messages</li>
       </ul>
 

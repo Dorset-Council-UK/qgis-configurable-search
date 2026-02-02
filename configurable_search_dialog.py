@@ -11,6 +11,7 @@ from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem
 from qgis.core import QgsProject, QgsVectorLayer, QgsApplication
 from qgis.gui import QgsAuthConfigSelect
 from .provider_templates import get_template_display_names, get_template_by_display_name, apply_template_to_provider
+from . import help as help_module
 
 
 class AdvancedSearchPanelDialog(QDialog):
@@ -641,13 +642,20 @@ class ProviderEditDialog(QDialog):
         # Buttons
         button_layout = QHBoxLayout()
         
+        # Help button on the left
+        self.help_button = QPushButton("Help")
+        self.help_button.clicked.connect(self.show_help)
+        self.help_button.setToolTip("Open help documentation for Layer-Based Providers")
+        button_layout.addWidget(self.help_button)
+        
+        button_layout.addStretch()
+        
         self.ok_button = QPushButton("OK")
         self.ok_button.clicked.connect(self.accept)
         
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.reject)
         
-        button_layout.addStretch()
         button_layout.addWidget(self.ok_button)
         button_layout.addWidget(self.cancel_button)
         
@@ -932,3 +940,7 @@ class ProviderEditDialog(QDialog):
         provider["result_parser"] = parser
         
         return provider
+    
+    def show_help(self):
+        """Open the help documentation."""
+        help_module.show_help()
