@@ -38,7 +38,6 @@ class SearchEngine(QObject):
         if not search_term.strip():
             return
             
-        print(f"DEBUG: Starting search for term: {search_term}")
         self.search_started.emit(search_term)
         
         # Force UI update to show loading message before starting search
@@ -56,7 +55,6 @@ class SearchEngine(QObject):
         results = []
         search_stopped = False
         
-        print(f"DEBUG: Found {len(providers)} enabled providers")
         
         # Search through providers in priority order
         # Two ways to stop searching:
@@ -64,14 +62,12 @@ class SearchEngine(QObject):
         # 2. Global "stop_on_first_result" setting is enabled and any provider returns results
         for provider in providers:
             provider_name = provider.get("name", "Unknown")
-            print(f"DEBUG: Starting search for provider: {provider_name}")
             
             # Emit provider-specific signal
             self.provider_search_started.emit(provider_name, search_term)
             QApplication.processEvents()
             
             provider_results = self._search_provider(provider, search_term, iface)
-            print(f"DEBUG: Provider {provider_name} returned {len(provider_results) if provider_results else 0} results")
             
             if provider_results:
                 results.extend(provider_results)
@@ -85,7 +81,6 @@ class SearchEngine(QObject):
                     break
             
         # Process results
-        print(f"DEBUG: Processing {len(results)} total results")
         self._process_results(results, iface)
         self.search_completed.emit(results)
         
@@ -603,7 +598,6 @@ class SearchEngine(QObject):
         results = []
         max_features = 50  # Default max features
         
-        print(f"DEBUG: Starting layer search in {layer.name()}")
         QgsMessageLog.logMessage(
             f"Searching layer {layer.name()} with optimized expression", 
             "Advanced Search Panel", 
@@ -618,20 +612,20 @@ class SearchEngine(QObject):
             search_fields = provider.get("search_fields", "").strip()
             search_mode = provider.get("search_mode", "wildcard")
             
-            print(f"DEBUG: Search fields: {search_fields}, Search mode: {search_mode}")
             
-            # Determine which fields to search
+            # Determine which fields to search and categorize by type
             if search_fields:
                 # Use specified fields
                 field_names = [field.strip() for field in search_fields.split(",") if field.strip()]
-                # Validate that fields exist in layer
-                layer_field_names = [field.name() for field in layer.fields()]
-                field_names = [name for name in field_names if name in layer_field_names]
+                # Validate that fields exist in layer and get their types
+                layer_fields_dict = {field.name(): field for field in layer.fields()}
+                field_names = [name for name in field_names if name in layer_fields_dict]
             else:
-                # Use all string/text fields
+                # Use all string/text and numeric fields
                 field_names = []
                 for field in layer.fields():
-                    if field.type() in (QVariant.String, QVariant.Char):
+                    if field.type() in (QVariant.String, QVariant.Char, QVariant.Int, 
+                                       QVariant.LongLong, QVariant.Double):
                         field_names.append(field.name())
             
             if not field_names:
@@ -642,20 +636,44 @@ class SearchEngine(QObject):
                 )
                 return results
             
-            print(f"DEBUG: Searching fields: {field_names}")
             
-            # Build search expression based on mode
+            # Build field type lookup
+            layer_fields_dict = {field.name(): field for field in layer.fields()}
+            
+            # Build search expression based on mode and field type
             expression_parts = []
             escaped_search_term = search_term.replace("'", "''")  # Escape single quotes
             
             if search_mode == "exact":
-                # Exact match (case insensitive)
+                # Exact match
                 for field_name in field_names:
-                    expression_parts.append(f'upper("{field_name}") = upper(\'{escaped_search_term}\')')
+                    field = layer_fields_dict.get(field_name)
+                    if field and field.type() in (QVariant.Int, QVariant.LongLong, QVariant.Double):
+                        # Numeric field - direct comparison (try to convert search term to number)
+                        try:
+                            # Test if search term is numeric
+                            float(search_term)
+                            expr = f'"{field_name}" = {search_term}'
+                            expression_parts.append(expr)
+                        except ValueError:
+                            # Search term is not numeric, skip this field
+                            pass
+                    else:
+                        # String field - case insensitive comparison
+                        expr = f'upper("{field_name}") = upper(\'{escaped_search_term}\')'
+                        expression_parts.append(expr)
             else:
-                # Wildcard/contains match (case insensitive)
+                # Wildcard/contains match
                 for field_name in field_names:
-                    expression_parts.append(f'"{field_name}" ILIKE \'%{escaped_search_term}%\'')
+                    field = layer_fields_dict.get(field_name)
+                    if field and field.type() in (QVariant.Int, QVariant.LongLong, QVariant.Double):
+                        # Numeric field - convert to string and use ILIKE
+                        expr = f'to_string("{field_name}") ILIKE \'%{escaped_search_term}%\''
+                        expression_parts.append(expr)
+                    else:
+                        # String field - case insensitive ILIKE
+                        expr = f'"{field_name}" ILIKE \'%{escaped_search_term}%\''
+                        expression_parts.append(expr)
             
             # Combine expressions with OR
             if expression_parts:
@@ -672,62 +690,138 @@ class SearchEngine(QObject):
                 request.setFilterExpression(filter_expression)
                 request.setLimit(max_features)
                 
+                # Validate the expression before executing
+                expr = QgsExpression(filter_expression)
+                if expr.hasParserError():
+                    error_msg = f"Expression parse error: {expr.parserErrorString()}"
+                    QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
+                    return results
+                
+                
                 # Execute the filtered query
                 features = layer.getFeatures(request)
                 count = 0
+                features_found = 0
+                
+                # Execute the filtered query
+                features = layer.getFeatures(request)
+                count = 0
+                features_found = 0
                 
                 for feature in features:
-                    if count >= max_features:
-                        break
+                    try:
+                        features_found += 1
+                        
+                        if count >= max_features:
+                            break
+                        
+                        # Debug: Log all field values for this feature
+                        for field_name in field_names:
+                            try:
+                                field_value = feature[field_name]
+                            except Exception as e:
+                                pass
+                        
+                        # Find which field matched for display purposes
+                        matched_field = None
+                        matched_value = None
+                    except Exception as e:
+                        import traceback
+                        continue
                     
-                    # Find which field matched for display purposes
-                    matched_field = None
-                    matched_value = None
-                    
-                    for field_name in field_names:
-                        field_value = feature[field_name]
-                        if field_value and isinstance(field_value, str):
-                            if search_mode == "exact":
-                                if field_value.lower() == search_term.lower():
-                                    matched_field = field_name
-                                    matched_value = field_value
-                                    break
-                            else:
-                                if search_term.lower() in field_value.lower():
-                                    matched_field = field_name
-                                    matched_value = field_value
-                                    break
-                    
-                    if matched_field and matched_value:
-                        results.append({
-                            "name": f"Feature: {matched_value[:50]}{'...' if len(str(matched_value)) > 50 else ''}",
-                            "provider": f"Layer: {layer.name()}",
-                            "type": "feature",
-                            "geometry": feature.geometry(),
-                            "data": {
-                                "layer_id": layer.id(),
-                                "layer_name": layer.name(),
-                                "feature_id": feature.id(),
-                                "attributes": feature.attributes(),
-                                "search_term": search_term,
-                                "matched_field": matched_field,
-                                "matched_value": matched_value,
-                                "search_mode": search_mode,
-                                "search_fields": field_names
-                            }
-                        })
-                        count += 1
+                    try:
+                        for field_name in field_names:
+                            try:
+                                field_value = feature[field_name]
+                                field = layer_fields_dict.get(field_name)
+                                
+                                # Check if this is a numeric field
+                                is_numeric = field and field.type() in (QVariant.Int, QVariant.LongLong, QVariant.Double)
+                                
+                                if is_numeric:
+                                    # For numeric fields, check if values match
+                                    try:
+                                        search_as_number = float(search_term)
+                                        if field_value is not None:
+                                            if search_mode == "exact":
+                                                if float(field_value) == search_as_number:
+                                                    matched_field = field_name
+                                                    matched_value = field_value
+                                                    break
+                                            else:  # wildcard
+                                                if search_term in str(field_value):
+                                                    matched_field = field_name
+                                                    matched_value = field_value
+                                                    break
+                                    except (ValueError, TypeError) as e:
+                                        continue
+                                else:
+                                    # For string fields
+                                    if field_value and isinstance(field_value, str):
+                                        if search_mode == "exact":
+                                            if field_value.lower() == search_term.lower():
+                                                matched_field = field_name
+                                                matched_value = field_value
+                                                break
+                                        else:
+                                            if search_term.lower() in field_value.lower():
+                                                matched_field = field_name
+                                                matched_value = field_value
+                                                break
+                            except Exception as e:
+                                import traceback
+                                continue
+                        
+                        if matched_field and matched_value is not None:
+                            try:
+                                # Get attributes safely
+                                attrs = []
+                                for field in layer.fields():
+                                    try:
+                                        attrs.append(feature[field.name()])
+                                    except:
+                                        attrs.append(None)
+                                
+                                # Convert matched_value to string for display
+                                matched_value_str = str(matched_value)
+                                display_name = f"Feature: {matched_value_str[:50]}{'...' if len(matched_value_str) > 50 else ''}"
+                                
+                                results.append({
+                                    "name": display_name,
+                                    "provider": f"Layer: {layer.name()}",
+                                    "type": "feature",
+                                    "geometry": feature.geometry(),
+                                    "data": {
+                                        "layer_id": layer.id(),
+                                        "layer_name": layer.name(),
+                                        "feature_id": feature.id(),
+                                        "attributes": attrs,
+                                        "search_term": search_term,
+                                        "matched_field": matched_field,
+                                        "matched_value": matched_value,
+                                        "search_mode": search_mode,
+                                        "search_fields": field_names
+                                    }
+                                })
+                                count += 1
+                            except Exception as e:
+                                import traceback
+                                pass
+                        else:
+                            pass
+                    except Exception as e:
+                        import traceback
+                        continue
+                
                 
                 QgsMessageLog.logMessage(
                     f"Found {count} matching features in layer {layer.name()}", 
                     "Advanced Search Panel", 
                     Qgis.Info
                 )
-                print(f"DEBUG: Layer search completed, returning {count} results")
                 
         except Exception as e:
             error_msg = f"Error searching features in layer {layer.name()}: {str(e)}"
-            print(f"DEBUG: Layer search error: {error_msg}")
             QgsMessageLog.logMessage(
                 error_msg, 
                 "Advanced Search Panel", 
@@ -814,5 +908,4 @@ class SearchEngine(QObject):
                 "Advanced Search Panel", 
                 Qgis.Info
             )
-        
-        # Results are now handled by the SearchWidget's results list
+
