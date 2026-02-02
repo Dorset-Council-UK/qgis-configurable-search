@@ -133,7 +133,7 @@ class AdvancedSearchPanelDialog(QDialog):
         
         # Add info label about project providers
         layout.addWidget(self.project_info_label)
-        self.project_info_label.hide() # Initially hidden
+        self.project_info_label.hide()  # Initially hidden
         
         widget.setLayout(layout)
         return widget
