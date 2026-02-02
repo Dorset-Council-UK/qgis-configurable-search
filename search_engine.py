@@ -726,7 +726,6 @@ class SearchEngine(QObject):
                         matched_field = None
                         matched_value = None
                     except Exception as e:
-                        import traceback
                         continue
                     
                     try:
@@ -769,7 +768,6 @@ class SearchEngine(QObject):
                                                 matched_value = field_value
                                                 break
                             except Exception as e:
-                                import traceback
                                 continue
                         
                         if matched_field and matched_value is not None:
@@ -779,7 +777,7 @@ class SearchEngine(QObject):
                                 for field in layer.fields():
                                     try:
                                         attrs.append(feature[field.name()])
-                                    except:
+                                    except Exception:
                                         attrs.append(None)
                                 
                                 # Convert matched_value to string for display
@@ -805,12 +803,10 @@ class SearchEngine(QObject):
                                 })
                                 count += 1
                             except Exception as e:
-                                import traceback
                                 pass
                         else:
                             pass
                     except Exception as e:
-                        import traceback
                         continue
                 
                 
