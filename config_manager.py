@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from qgis.PyQt.QtCore import QSettings
 from qgis.PyQt.QtWidgets import QFileDialog, QMessageBox
-from qgis.core import QgsProject, QgsMessageLog, Qgis
+from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsExpressionContextUtils
 
 
 class ConfigManager:
@@ -108,9 +108,9 @@ class ConfigManager:
             
             # Read the custom property from the project
             # readEntry returns a tuple: (value, ok)
-            search_providers_json, ok = project.readEntry("AdvancedSearchPanel", "search_providers", "")
+            search_providers_json = QgsExpressionContextUtils.projectScope(project).variable("search_providers")
             
-            if not ok or not search_providers_json:
+            if search_providers_json is None or not search_providers_json:
                 # Setting not found or empty, set to None
                 QgsMessageLog.logMessage(
                     "No search_providers found in project properties",
@@ -147,7 +147,7 @@ class ConfigManager:
             final_providers = providers_to_import
             
             QgsMessageLog.logMessage(
-                f"Loaded {len(final_providers)} search provider(s) from project properties",
+                f"Found {len(final_providers)} search provider(s) from project properties",
                 "Advanced Search Panel",
                 Qgis.Info
             )

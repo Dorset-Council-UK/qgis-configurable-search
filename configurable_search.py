@@ -198,11 +198,7 @@ class AdvancedSearchPanel:
             
             if providers:
                 self.project_providers = providers
-                QgsMessageLog.logMessage(
-                    f"Loaded {len(providers)} search provider(s) from project",
-                    "Advanced Search Panel",
-                    Qgis.Info
-                )
+                
             else:
                 self.project_providers = None
                 QgsMessageLog.logMessage(
