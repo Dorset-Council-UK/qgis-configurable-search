@@ -177,8 +177,55 @@ class AdvancedSearchPanel:
         # Create search dock widget
         self.create_search_widget()
         
+        # Connect to project signals for loading project-specific providers
+        QgsProject.instance().readProject.connect(self.on_project_read)
+        QgsProject.instance().cleared.connect(self.on_project_cleared)
+        
+        # Load project providers if a project is already loaded
+        self.on_project_read()
+        
         # will be set False in run()
         self.first_start = True
+
+    def on_project_read(self):
+        """Handle project read event - load project-specific search providers."""
+        try:
+            # Import providers from project properties
+            # import_project_providers() stores in config_manager.project_providers
+            success = self.config_manager.import_project_providers()
+            
+            if success:
+                QgsMessageLog.logMessage(
+                    f"Loaded project-specific search providers",
+                    "Advanced Search Panel",
+                    Qgis.Info
+                )
+            else:
+                QgsMessageLog.logMessage(
+                    "No project-specific search providers found",
+                    "Advanced Search Panel",
+                    Qgis.Info
+                )
+            
+            # Refresh the dialog if it exists and is visible
+            if hasattr(self, 'dlg') and self.dlg and self.dlg.isVisible():
+                self.dlg.load_providers()
+                
+        except Exception as e:
+            QgsMessageLog.logMessage(
+                f"Error loading project providers: {str(e)}",
+                "Advanced Search Panel",
+                Qgis.Warning
+            )
+            self.project_providers = None
+    
+    def on_project_cleared(self):
+        """Handle project cleared event - clear project-specific search providers."""
+        self.config_manager.clear_project_providers()
+        
+        # Refresh the dialog if it exists and is visible
+        if hasattr(self, 'dlg') and self.dlg and self.dlg.isVisible():
+            self.dlg.load_providers()
 
     def create_search_widget(self):
         """Create the search dock widget panel."""
@@ -207,6 +254,13 @@ class AdvancedSearchPanel:
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
+        # Disconnect project signals
+        try:
+            QgsProject.instance().readProject.disconnect(self.on_project_read)
+            QgsProject.instance().cleared.disconnect(self.on_project_cleared)
+        except Exception:
+            pass
+        
         for action in self.actions:
             self.iface.removePluginMenu(
                 self.tr(u'&Advanced Search Panel'),
@@ -226,7 +280,8 @@ class AdvancedSearchPanel:
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if hasattr(self, 'dlg') and self.dlg:
-            pass
+            # Reload providers in case they changed since dialog was last shown
+            self.dlg.load_providers()
         else:
             self.dlg = AdvancedSearchPanelDialog(self.config_manager)
 
