@@ -697,12 +697,6 @@ class SearchEngine(QObject):
                     QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Warning)
                     return results
                 
-                
-                # Execute the filtered query
-                features = layer.getFeatures(request)
-                count = 0
-                features_found = 0
-                
                 # Execute the filtered query
                 features = layer.getFeatures(request)
                 count = 0
