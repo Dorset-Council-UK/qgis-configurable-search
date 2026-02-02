@@ -191,15 +191,26 @@ class AdvancedSearchPanel:
         """Handle project read event - load project-specific search providers."""
         try:
             # Import providers from project properties
-            providers = self.config_manager.import_project_providers()
+            # import_project_providers() stores in config_manager.project_providers
+            success = self.config_manager.import_project_providers()
             
-            if providers == False:
-                self.project_providers = None
+            if success:
+                QgsMessageLog.logMessage(
+                    f"Loaded project-specific search providers",
+                    "Advanced Search Panel",
+                    Qgis.Info
+                )
+            else:
                 QgsMessageLog.logMessage(
                     "No project-specific search providers found",
                     "Advanced Search Panel",
                     Qgis.Info
                 )
+            
+            # Refresh the dialog if it exists and is visible
+            if hasattr(self, 'dlg') and self.dlg and self.dlg.isVisible():
+                self.dlg.load_providers()
+                
         except Exception as e:
             QgsMessageLog.logMessage(
                 f"Error loading project providers: {str(e)}",
@@ -209,7 +220,12 @@ class AdvancedSearchPanel:
             self.project_providers = None
     
     def on_project_cleared(self):
+        """Handle project cleared event - clear project-specific search providers."""
         self.config_manager.clear_project_providers()
+        
+        # Refresh the dialog if it exists and is visible
+        if hasattr(self, 'dlg') and self.dlg and self.dlg.isVisible():
+            self.dlg.load_providers()
 
     def create_search_widget(self):
         """Create the search dock widget panel."""
@@ -264,7 +280,8 @@ class AdvancedSearchPanel:
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if hasattr(self, 'dlg') and self.dlg:
-            pass
+            # Reload providers in case they changed since dialog was last shown
+            self.dlg.load_providers()
         else:
             self.dlg = AdvancedSearchPanelDialog(self.config_manager)
 

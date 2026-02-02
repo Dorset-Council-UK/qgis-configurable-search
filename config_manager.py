@@ -38,16 +38,32 @@ class ConfigManager:
         self.settings.setValue(f"{self.plugin_key}/config", config_str)
         
     def get_search_providers(self):
-        """Get the list of search providers."""
+        """Get the list of search providers.
+        
+        Returns project-specific providers merged with global providers.
+        Each provider will have a '_source' field indicating 'project' or 'global'.
+        """
+        # Get global providers from settings
         config = self.get_config()
         global_providers = config.get("search_providers", [])
-
+        
+        # Mark global providers with source
+        for provider in global_providers:
+            provider["_source"] = "global"
+        
         # If no project providers, return global only
         if self.project_providers is None:
             return global_providers
-
+        
+        # Mark project providers with source
+        project_providers_marked = []
+        for provider in self.project_providers:
+            marked_provider = provider.copy()
+            marked_provider["_source"] = "project"
+            project_providers_marked.append(marked_provider)
+        
         # Merge project-specific providers with global ones
-        return self.project_providers + global_providers
+        return project_providers_marked + global_providers
     
     def save_search_providers(self, providers):
         """Save the list of search providers."""

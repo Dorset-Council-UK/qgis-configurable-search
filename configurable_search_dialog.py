@@ -20,6 +20,12 @@ class AdvancedSearchPanelDialog(QDialog):
         super().__init__()
         self.config_manager = config_manager
         self.config = config_manager.get_config()
+
+         # Add info label about project providers
+        self.project_info_label = QLabel("ℹ️ Project providers are loaded from the current QGIS project and cannot be edited here.")
+        self.project_info_label.setStyleSheet("color: #666; font-style: italic; padding: 5px; background-color: #f0f0f0; border-radius: 3px;")
+        self.project_info_label.setWordWrap(True)
+
         self.setup_ui()
         self.load_config()
         
@@ -59,7 +65,6 @@ class AdvancedSearchPanelDialog(QDialog):
         button_layout.addWidget(self.ok_button)
         button_layout.addWidget(self.cancel_button)
         button_layout.addWidget(self.apply_button)
-        
         layout.addLayout(button_layout)
         self.setLayout(layout)
         
@@ -76,6 +81,9 @@ class AdvancedSearchPanelDialog(QDialog):
         
         # Connect double-click to edit provider
         self.providers_table.doubleClicked.connect(self.edit_provider)
+        
+        # Connect selection change to update button states
+        self.providers_table.selectionModel().selectionChanged.connect(self.update_button_states)
         
         # Make table columns resizable
         header = self.providers_table.horizontalHeader()
@@ -122,8 +130,35 @@ class AdvancedSearchPanelDialog(QDialog):
         button_layout.addWidget(self.move_down_button)
         
         layout.addLayout(button_layout)
+        
+        # Add info label about project providers
+        layout.addWidget(self.project_info_label)
+        self.project_info_label.hide() # Initially hidden
+        
         widget.setLayout(layout)
         return widget
+    
+    def update_button_states(self):
+        """Update the enabled state of edit/remove buttons based on selection."""
+        selected_rows = self.providers_table.selectionModel().selectedRows()
+        
+        if not selected_rows:
+            self.edit_provider_button.setEnabled(True)
+            self.remove_provider_button.setEnabled(True)
+            self.project_info_label.hide()
+            return
+        
+        row = selected_rows[0].row()
+        provider = self.providers_model.get_provider(row)
+        
+        # Disable edit and remove for project providers
+        is_project_provider = provider.get("_source") == "project" if provider else False
+        self.edit_provider_button.setEnabled(not is_project_provider)
+        self.remove_provider_button.setEnabled(not is_project_provider)
+        if is_project_provider: 
+            self.project_info_label.show()
+        else:
+            self.project_info_label.hide()
         
     def create_settings_tab(self):
         """Create the general settings tab."""
@@ -206,11 +241,20 @@ class AdvancedSearchPanelDialog(QDialog):
         providers = self.config_manager.get_search_providers()
         self.providers_model.set_providers(providers)
         
+        # Update button states after loading
+        self.update_button_states()
         
     def save_config(self):
         """Save configuration from the UI."""
-        # Save providers
-        self.config["search_providers"] = self.providers_model.get_providers()
+        # Save only global providers (filter out project providers)
+        all_providers = self.providers_model.get_providers()
+        global_providers = [p for p in all_providers if p.get("_source") != "project"]
+        
+        # Remove the _source marker before saving
+        for provider in global_providers:
+            provider.pop("_source", None)
+        
+        self.config["search_providers"] = global_providers
         
         # Save general settings
         self.config["stop_on_first_result"] = self.stop_on_first_checkbox.isChecked()
@@ -229,6 +273,7 @@ class AdvancedSearchPanelDialog(QDialog):
         dialog = ProviderEditDialog()
         if dialog.exec_() == QDialog.Accepted:
             provider = dialog.get_provider()
+            provider["_source"] = "global"  # New providers are always global
             self.providers_model.add_provider(provider)
             
     def edit_provider(self, index=None):
@@ -251,9 +296,20 @@ class AdvancedSearchPanelDialog(QDialog):
         
         provider = self.providers_model.get_provider(row)
         
+        # Check if this is a project provider
+        if provider.get("_source") == "project":
+            QMessageBox.information(
+                self,
+                "Cannot Edit Project Provider",
+                "This provider is loaded from the QGIS project properties and cannot be edited here.\n\n"
+                "To modify project providers, you need to update the project's 'search_providers' variable."
+            )
+            return
+        
         dialog = ProviderEditDialog(provider)
         if dialog.exec_() == QDialog.Accepted:
             updated_provider = dialog.get_provider()
+            updated_provider["_source"] = "global"  # Maintain source
             self.providers_model.update_provider(row, updated_provider)
             
     def remove_provider(self):
@@ -265,6 +321,16 @@ class AdvancedSearchPanelDialog(QDialog):
             
         row = selected_rows[0].row()
         provider = self.providers_model.get_provider(row)
+        
+        # Check if this is a project provider
+        if provider.get("_source") == "project":
+            QMessageBox.information(
+                self,
+                "Cannot Remove Project Provider",
+                "This provider is loaded from the QGIS project properties and cannot be removed here.\n\n"
+                "To remove project providers, you need to update the project's 'search_providers' variable."
+            )
+            return
         
         reply = QMessageBox.question(
             self, 
@@ -357,7 +423,7 @@ class ProvidersTableModel(QAbstractTableModel):
     def __init__(self):
         super().__init__()
         self.providers = []
-        self.headers = ["Name", "Type", "Enabled", "Priority", "Regex Filter"]
+        self.headers = ["Source", "Name", "Type", "Enabled", "Priority", "Regex Filter"]
         
     def set_providers(self, providers):
         """Set the providers list."""
@@ -437,16 +503,25 @@ class ProvidersTableModel(QAbstractTableModel):
         column = index.column()
         
         if role == Qt.DisplayRole:
-            if column == 0:  # Name
+            if column == 0:  # Source
+                source = provider.get("_source", "global")
+                return "Project" if source == "project" else "Global"
+            elif column == 1:  # Name
                 return provider.get("name", "")
-            elif column == 1:  # Type
+            elif column == 2:  # Type
                 return provider.get("provider_type", "api").title()
-            elif column == 2:  # Enabled
+            elif column == 3:  # Enabled
                 return "Yes" if provider.get("enabled", True) else "No"
-            elif column == 3:  # Priority
+            elif column == 4:  # Priority
                 return str(provider.get("priority", 1))
-            elif column == 4:  # Regex Filter
+            elif column == 5:  # Regex Filter
                 return provider.get("regex_filter", "")
+        
+        elif role == Qt.ForegroundRole:
+            # Make project providers appear in a different color
+            if provider.get("_source") == "project":
+                from qgis.PyQt.QtGui import QColor
+                return QColor("#0066cc")  # Blue color for project providers
                 
         return QVariant()
         
