@@ -33,7 +33,7 @@ echo Creating plugin package...
 REM Use full path to PowerShell instead of relying on PATH
 if exist "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" (
     "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -command "Compress-Archive -Path *.py, *.txt, *.md, *.svg, *.qrc, help -DestinationPath '%OUTPUT_FOLDER%\configurable_search.zip'"
-    echo Plugin build complete: %OUTPUT_FOLDER%\configurable_search.zip
+    echo Plugin package complete: %OUTPUT_FOLDER%\configurable_search.zip
 ) else (
     echo PowerShell not available, creating package manually...
     REM Create a simple archive using built-in tools or skip
