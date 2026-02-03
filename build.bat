@@ -1,7 +1,23 @@
 @echo off
 echo Building Configurable Search QGIS Plugin...
-call "C:\PROGRA~1\QGIS_3\bin\o4w_env.bat"
-set PYTHONPATH=C:\PROGRA~1\QGIS_3\apps\Python312\Scripts;%PYTHONPATH%
+
+REM Configure QGIS installation root (can be overridden by pre-setting QGIS_ROOT)
+if not defined QGIS_ROOT set "QGIS_ROOT=C:\PROGRA~1\QGIS_3"
+
+call "%QGIS_ROOT%\bin\o4w_env.bat"
+
+set PYTHONPATH=%QGIS_ROOT%\apps\Python312\Scripts;%PYTHONPATH%
+
+REM Prompt user for output location
+set /p OUTPUT_FOLDER="Enter output location (blank for current directory): "
+
+REM Use default if no input provided
+if "%OUTPUT_FOLDER%"=="" set OUTPUT_FOLDER=%~dp0
+
+echo.
+echo Outputting configurable_search.zip to: %OUTPUT_FOLDER%
+echo.
+
 REM Create resources file
 call pyrcc5 -o resources.py resources.qrc 2>nul
 if %ERRORLEVEL% neq 0 (
@@ -11,18 +27,18 @@ if %ERRORLEVEL% neq 0 (
 )
 
 REM Create plugin zip
-if exist configurable_search.zip del configurable_search.zip
+if exist "%OUTPUT_FOLDER%\configurable_search.zip" del "%OUTPUT_FOLDER%\configurable_search.zip"
 
 echo Creating plugin package...
-if exist powershell.exe (
-    powershell -command "Compress-Archive -Path *.py, *.txt, *.md, *.svg, *.qrc -DestinationPath configurable_search.zip"
+REM Use full path to PowerShell instead of relying on PATH
+if exist "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" (
+    "%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -command "Compress-Archive -Path *.py, *.txt, *.md, *.svg, *.qrc, help -DestinationPath '%OUTPUT_FOLDER%\configurable_search.zip'"
+    echo Plugin build complete: %OUTPUT_FOLDER%\configurable_search.zip
 ) else (
     echo PowerShell not available, creating package manually...
     REM Create a simple archive using built-in tools or skip
     echo Please manually create a zip file with all plugin files.
 )
-
-echo Plugin build complete: configurable_search.zip
 
 echo.
 echo To install:
