@@ -10,18 +10,22 @@ import subprocess
 from pathlib import Path
 
 
-def get_qgis_plugin_dir():
-    """Get the QGIS plugins directory for the current OS."""
+def get_qgis_plugin_dir(qgis_profile='QGIS3'):
+    """Get the QGIS plugins directory for the current OS.
+    
+    Args:
+        qgis_profile: QGIS profile name (default: 'QGIS3')
+    """
     if sys.platform.startswith('win'):
         # Windows
         appdata = os.environ.get('APPDATA', '')
-        return Path(appdata) / 'QGIS' / 'QGIS3' / 'profiles' / 'default' / 'python' / 'plugins'
+        return Path(appdata) / 'QGIS' / qgis_profile / 'profiles' / 'default' / 'python' / 'plugins'
     elif sys.platform.startswith('darwin'):
         # macOS
-        return Path.home() / 'Library' / 'Application Support' / 'QGIS' / 'QGIS3' / 'profiles' / 'default' / 'python' / 'plugins'
+        return Path.home() / 'Library' / 'Application Support' / 'QGIS' / qgis_profile / 'profiles' / 'default' / 'python' / 'plugins'
     else:
         # Linux
-        return Path.home() / '.local' / 'share' / 'QGIS' / 'QGIS3' / 'profiles' / 'default' / 'python' / 'plugins'
+        return Path.home() / '.local' / 'share' / 'QGIS' / qgis_profile / 'profiles' / 'default' / 'python' / 'plugins'
 
 
 def build_resources():
@@ -37,11 +41,16 @@ def build_resources():
         return False
 
 
-def install_plugin():
-    """Install the plugin to QGIS plugins directory."""
-    plugin_dir = get_qgis_plugin_dir() / 'advanced_search_panel'
+def install_plugin(qgis_profile='QGIS3'):
+    """Install the plugin to QGIS plugins directory.
+    
+    Args:
+        qgis_profile: QGIS profile name (default: 'QGIS3')
+    """
+    plugin_dir = get_qgis_plugin_dir(qgis_profile) / 'advanced_search_panel'
     
     print(f"Installing plugin to: {plugin_dir}")
+    print(f"  QGIS Profile: {qgis_profile}")
     
     # Create plugin directory
     plugin_dir.mkdir(parents=True, exist_ok=True)
@@ -91,9 +100,13 @@ def install_plugin():
     return True
 
 
-def verify_installation():
-    """Verify that the plugin is properly installed."""
-    plugin_dir = get_qgis_plugin_dir() / 'advanced_search_panel'
+def verify_installation(qgis_profile='QGIS3'):
+    """Verify that the plugin is properly installed.
+    
+    Args:
+        qgis_profile: QGIS profile name (default: 'QGIS3')
+    """
+    plugin_dir = get_qgis_plugin_dir(qgis_profile) / 'advanced_search_panel'
     
     if not plugin_dir.exists():
         print("✗ Plugin directory not found")
@@ -130,9 +143,13 @@ def verify_installation():
     return True
 
 
-def create_development_link():
-    """Create a symbolic link for development."""
-    plugin_dir = get_qgis_plugin_dir() / 'advanced_search_panel'
+def create_development_link(qgis_profile='QGIS3'):
+    """Create a symbolic link for development.
+    
+    Args:
+        qgis_profile: QGIS profile name (default: 'QGIS3')
+    """
+    plugin_dir = get_qgis_plugin_dir(qgis_profile) / 'advanced_search_panel'
     current_dir = Path.cwd()
     
     if plugin_dir.exists():
@@ -151,20 +168,42 @@ def create_development_link():
     except OSError as e:
         print(f"✗ Could not create symbolic link: {e}")
         print("  Falling back to file copy...")
-        return install_plugin()
+        return install_plugin(qgis_profile)
+
+
+def parse_arguments():
+    """Parse command line arguments."""
+    qgis_profile = 'QGIS3'  # Default profile
+    
+    # Look for --profile argument
+    for i, arg in enumerate(sys.argv):
+        if arg == '--profile' and i + 1 < len(sys.argv):
+            qgis_profile = sys.argv[i + 1]
+            # Remove profile arguments from sys.argv
+            sys.argv.pop(i + 1)
+            sys.argv.pop(i)
+            break
+    
+    return qgis_profile
 
 
 def main():
     """Main setup function."""
+    # Parse profile argument first
+    qgis_profile = parse_arguments()
+    
     if len(sys.argv) < 2:
         print("Advanced Search Panel QGIS Plugin Setup")
         print("")
         print("Usage:")
-        print("  python setup.py build       - Build resources")
-        print("  python setup.py install     - Install plugin")
-        print("  python setup.py dev         - Setup development environment")
-        print("  python setup.py verify      - Verify plugin installation")
-        print("  python setup.py info        - Show plugin information")
+        print("  python setup.py build                    - Build resources")
+        print("  python setup.py install [--profile NAME] - Install plugin")
+        print("  python setup.py dev [--profile NAME]     - Setup development environment")
+        print("  python setup.py verify [--profile NAME]  - Verify plugin installation")
+        print("  python setup.py info [--profile NAME]    - Show plugin information")
+        print("")
+        print("Options:")
+        print("  --profile NAME   Specify QGIS profile (default: QGIS3)")
         return
     
     command = sys.argv[1]
@@ -174,28 +213,31 @@ def main():
     
     elif command == 'install':
         build_resources()
-        install_plugin()
-        verify_installation()
+        install_plugin(qgis_profile)
+        verify_installation(qgis_profile)
         print("")
         print("Plugin installed successfully!")
+        print(f"  QGIS Profile: {qgis_profile}")
         print("Restart QGIS and enable the plugin in the Plugin Manager or use the Plugin Reloader plugin to see the changes.")
     
     elif command == 'dev':
         build_resources()
-        create_development_link()
-        verify_installation()
+        create_development_link(qgis_profile)
+        verify_installation(qgis_profile)
         print("")
         print("Development environment setup complete!")
+        print(f"  QGIS Profile: {qgis_profile}")
         print("Changes to the plugin files will be reflected immediately in QGIS.")
         print("Restart QGIS to load the plugin.")
     
     elif command == 'verify':
-        verify_installation()
+        verify_installation(qgis_profile)
     
     elif command == 'info':
-        plugin_dir = get_qgis_plugin_dir()
+        plugin_dir = get_qgis_plugin_dir(qgis_profile)
         print("Advanced Search Panel QGIS Plugin")
         print("=" * 40)
+        print(f"QGIS Profile: {qgis_profile}")
         print(f"Current directory: {Path.cwd()}")
         print(f"QGIS plugins directory: {plugin_dir}")
         print(f"Plugin directory: {plugin_dir / 'advanced_search_panel'}")

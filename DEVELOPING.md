@@ -11,13 +11,25 @@
 
 3. Start QGIS and enable the plugin in the Plugin Manager
 
-## Building
-Run `python setup.py install` to compile the project and copy the files into your QGIS plugins directory.
+## Compilation
+
+To test any local changes you should compile the project using the provided `Compile_publish.bat` 
+(Windows) script.
+
+The script will ask you to specify which QGIS profile to publish the results into as you may have 
+multiple profiles associated with your QGIS installation. You can also control the installation 
+path of QGIS itself as the script uses the QGIS python environment to compile the resources.
+
+## Packaging
+
+To package the plugin for distribution, use the provided `Package.bat` (Windows)
+This will generate a ZIP file in a directory of your choice that can be uploaded to a QGIS repository. 
 
 ## Project Structure
 ```
 qgis-configurable-search/
-├── __init__.py                      # Plugin entry point
+├── __init__.py                     # Plugin entry point
+├── Compile_publish.bat             # Windows compilation script
 ├── configurable_search.py          # Main plugin class
 ├── configurable_search_dialog.py   # Configuration dialog UI
 ├── config_manager.py               # Configuration management & import/export
@@ -41,8 +53,7 @@ qgis-configurable-search/
 ├── icon-mono-configure.svg         # Configuration button icon
 ├── icon-mono-help.svg              # Help button icon
 ├── icon-mono-search.svg            # Search button icon
-├── build.bat                       # Windows build script
-├── build.sh                        # Unix build script
+├── Package.bat                     # Windows packaging script
 ├── Makefile                        # Build automation
 ├── .gitignore                      # Git ignore rules
 ├── LICENCE                         # License file
