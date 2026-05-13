@@ -81,7 +81,23 @@ class ConfigManager:
         config = self.get_config()
         config[key] = value
         self.save_config(config)
-        
+
+    def get_toolbar_name(self):
+        """Get the configured toolbar name.
+
+        Stored as a standalone QSettings key, not in the exported JSON config,
+        so it is local to this machine and never committed to source control.
+        """
+        return self.settings.value(f"{self.plugin_key}/toolbar_name", "")
+
+    def set_toolbar_name(self, toolbar_name):
+        """Set the configured toolbar name.
+
+        Stored as a standalone QSettings key, not in the exported JSON config,
+        so it is local to this machine and never committed to source control.
+        """
+        self.settings.setValue(f"{self.plugin_key}/toolbar_name", toolbar_name)
+
     def create_default_providers(self):
         """Create some default search providers as examples."""
         default_providers = [

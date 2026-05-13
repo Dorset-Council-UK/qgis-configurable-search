@@ -2,7 +2,7 @@ import os
 import sys
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QThread, pyqtSignal, QTimer
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy, QDockWidget
+from qgis.PyQt.QtWidgets import QAction, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy, QDockWidget, QToolBar
 from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsGeometry, QgsRectangle, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPointXY
 from qgis.gui import QgsGui
 
@@ -11,7 +11,6 @@ from .resources import *
 from .configurable_search_dialog import AdvancedSearchPanelDialog
 from .search_engine import SearchEngine
 from .config_manager import ConfigManager
-from . import help
 from . import help
 
 
@@ -74,6 +73,28 @@ class AdvancedSearchPanel:
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('AdvancedSearchPanel', message)
 
+    def _get_configured_toolbar(self):
+        """Get the toolbar for plugin icons based on settings.
+
+        Returns the configured toolbar if found, creates it if the name is set
+        but does not exist, or returns None to use the default Plugins toolbar.
+        """
+        toolbar_name = self.config_manager.get_toolbar_name()
+        if toolbar_name:
+            toolbar = self.iface.mainWindow().findChild(QToolBar, toolbar_name)
+            if toolbar:
+                return toolbar
+            # Name is set but toolbar doesn't exist — create it
+            toolbar = self.iface.mainWindow().addToolBar(toolbar_name)
+            toolbar.setObjectName(toolbar_name)
+            QgsMessageLog.logMessage(
+                f"Created toolbar '{toolbar_name}'.",
+                "Advanced Search Panel",
+                Qgis.Info
+            )
+            return toolbar
+        return None
+
     def add_action(
         self,
         icon_path,
@@ -133,8 +154,11 @@ class AdvancedSearchPanel:
             action.setWhatsThis(whats_this)
 
         if add_to_toolbar:
-            # Adds plugin icon to Plugins toolbar
-            self.iface.addToolBarIcon(action)
+            configured_toolbar = self._get_configured_toolbar()
+            if configured_toolbar:
+                configured_toolbar.addAction(action)
+            else:
+                self.iface.addToolBarIcon(action)  # Adds plugin icon to Plugins toolbar
 
         if add_to_menu:
             self.iface.addPluginToMenu(
@@ -261,12 +285,17 @@ class AdvancedSearchPanel:
         except Exception:
             pass
         
+        configured_toolbar = self._get_configured_toolbar()
+
         for action in self.actions:
             self.iface.removePluginMenu(
                 self.tr(u'&Advanced Search Panel'),
                 action)
-            self.iface.removeToolBarIcon(action)
-        
+            if configured_toolbar:
+                configured_toolbar.removeAction(action)
+            else:
+                self.iface.removeToolBarIcon(action)
+
         # Remove the dock widget
         if hasattr(self, 'dock_widget') and self.dock_widget:
             self.iface.removeDockWidget(self.dock_widget)

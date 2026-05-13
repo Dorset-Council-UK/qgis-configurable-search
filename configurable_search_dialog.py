@@ -5,11 +5,13 @@ from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, 
     QPushButton, QTableView, QLineEdit, QSpinBox, QCheckBox, 
     QComboBox, QTextEdit, QLabel, QGroupBox, QFormLayout,
-    QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QDoubleSpinBox
+    QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QDoubleSpinBox,
+    QToolBar
 )
 from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem
 from qgis.core import QgsProject, QgsVectorLayer, QgsApplication
 from qgis.gui import QgsAuthConfigSelect
+from qgis.utils import iface as qgis_iface
 from .provider_templates import get_template_display_names, get_template_by_display_name, apply_template_to_provider
 from . import help as help_module
 
@@ -165,32 +167,52 @@ class AdvancedSearchPanelDialog(QDialog):
         """Create the general settings tab."""
         widget = QWidget()
         layout = QVBoxLayout()
-        
+
+        # Toolbar settings (machine-local, stored in QSettings only, never exported)
+        toolbar_group = QGroupBox("Toolbar")
+        toolbar_layout = QFormLayout()
+
+        self.toolbar_combo = QComboBox()
+        self._populate_toolbar_combo()
+        toolbar_layout.addRow("Add icons to toolbar:", self.toolbar_combo)
+
+        toolbar_desc = QLabel(
+            "Leave as Default to use the QGIS Plugins toolbar. "
+            "Select an existing toolbar to add icons to it. "
+            "Type a new name to create a dedicated toolbar."
+        )
+        toolbar_desc.setWordWrap(True)
+        toolbar_desc.setStyleSheet("color: #666; font-style: italic; padding: 2px;")
+        toolbar_layout.addRow(toolbar_desc)
+
+        toolbar_group.setLayout(toolbar_layout)
+        layout.addWidget(toolbar_group)
+
         # Search behavior settings
         behavior_group = QGroupBox("Search Behavior")
         behavior_layout = QFormLayout()
-        
+
         self.stop_on_first_checkbox = QCheckBox("Stop searching when first result is found")
         behavior_layout.addRow(self.stop_on_first_checkbox)
-        
+
         self.max_results_spinbox = QSpinBox()
         self.max_results_spinbox.setRange(1, 100)
         self.max_results_spinbox.setValue(10)
         behavior_layout.addRow("Max results per provider:", self.max_results_spinbox)
-        
+
         self.timeout_spinbox = QSpinBox()
         self.timeout_spinbox.setRange(5, 120)
         self.timeout_spinbox.setValue(30)
         self.timeout_spinbox.setSuffix(" seconds")
         behavior_layout.addRow("Search timeout:", self.timeout_spinbox)
-        
+
         behavior_group.setLayout(behavior_layout)
         layout.addWidget(behavior_group)
-        
+
         # Zoom settings
         zoom_group = QGroupBox("Zoom Behavior")
         zoom_layout = QFormLayout()
-        
+
         self.zoom_geographic_spinbox = QDoubleSpinBox()
         self.zoom_geographic_spinbox.setRange(0.0001, 1.0)
         self.zoom_geographic_spinbox.setDecimals(4)
@@ -198,25 +220,49 @@ class AdvancedSearchPanelDialog(QDialog):
         self.zoom_geographic_spinbox.setValue(0.001)
         self.zoom_geographic_spinbox.setSuffix(" degrees")
         zoom_layout.addRow("Geographic zoom buffer:", self.zoom_geographic_spinbox)
-        
+
         self.zoom_projected_spinbox = QSpinBox()
         self.zoom_projected_spinbox.setRange(10, 10000)
         self.zoom_projected_spinbox.setValue(500)
         self.zoom_projected_spinbox.setSuffix(" units")
         zoom_layout.addRow("Projected zoom buffer:", self.zoom_projected_spinbox)
-        
+
         zoom_group.setLayout(zoom_layout)
         layout.addWidget(zoom_group)
-        
+
         layout.addStretch()
         widget.setLayout(layout)
         return widget
-        
+
+    def _populate_toolbar_combo(self):
+        """Populate the toolbar combo with available QGIS toolbars."""
+        self.toolbar_combo.clear()
+        self.toolbar_combo.addItem("Default (Plugins toolbar)", userData="")
+
+        if qgis_iface:
+            toolbars = qgis_iface.mainWindow().findChildren(QToolBar)
+            for toolbar in sorted(toolbars, key=lambda t: t.windowTitle().lower()):
+                obj_name = toolbar.objectName()
+                title = toolbar.windowTitle()
+                if obj_name:
+                    self.toolbar_combo.addItem(title, userData=obj_name)
+
+        self.toolbar_combo.setEditable(True)
+        self.toolbar_combo.setInsertPolicy(QComboBox.NoInsert)
+        self.toolbar_combo.lineEdit().setPlaceholderText("Select or type a toolbar name...")
+
     def load_config(self):
         """Load configuration into the UI."""
         # Load providers
         self.load_providers()
-        
+
+        saved_toolbar_name = self.config_manager.get_toolbar_name()
+        index = self.toolbar_combo.findData(saved_toolbar_name)
+        if index >= 0:
+            self.toolbar_combo.setCurrentIndex(index)
+        else:
+            self.toolbar_combo.setCurrentText(saved_toolbar_name)
+
         # Load general settings
         self.stop_on_first_checkbox.setChecked(
             self.config.get("stop_on_first_result", False)
@@ -227,7 +273,7 @@ class AdvancedSearchPanelDialog(QDialog):
         self.timeout_spinbox.setValue(
             self.config.get("search_timeout", 30)
         )
-        
+
         # Load zoom settings
         self.zoom_geographic_spinbox.setValue(
             self.config.get("zoom_buffer_geographic", 0.001)
@@ -235,7 +281,8 @@ class AdvancedSearchPanelDialog(QDialog):
         self.zoom_projected_spinbox.setValue(
             self.config.get("zoom_buffer_projected", 500)
         )
-    
+
+
     def load_providers(self):
         """Load providers from config into the UI."""
         # Get merged providers (project + global)
@@ -256,7 +303,12 @@ class AdvancedSearchPanelDialog(QDialog):
             provider.pop("_source", None)
         
         self.config["search_providers"] = global_providers
-        
+
+        # Save toolbar name — stored in QSettings directly, not in the JSON config
+        self.config_manager.set_toolbar_name(
+            self.toolbar_combo.currentData() or self.toolbar_combo.currentText().strip()
+        )
+
         # Save general settings
         self.config["stop_on_first_result"] = self.stop_on_first_checkbox.isChecked()
         self.config["max_results_per_provider"] = self.max_results_spinbox.value()
