@@ -98,6 +98,26 @@ class ConfigManager:
         """
         self.settings.setValue(f"{self.plugin_key}/toolbar_name", toolbar_name)
 
+    def get_toolbar_buttons(self):
+        """Get which action buttons are shown in the toolbar.
+
+        Returns a (show_configure, show_toggle) tuple of bools.
+        Stored in QSettings, local to this machine.
+        """
+        show_configure = self.settings.value(
+            f"{self.plugin_key}/toolbar_show_configure", True, type=bool)
+        show_toggle = self.settings.value(
+            f"{self.plugin_key}/toolbar_show_toggle", True, type=bool)
+        return show_configure, show_toggle
+
+    def set_toolbar_buttons(self, show_configure, show_toggle):
+        """Set which action buttons are shown in the toolbar.
+
+        Stored in QSettings, local to this machine.
+        """
+        self.settings.setValue(f"{self.plugin_key}/toolbar_show_configure", show_configure)
+        self.settings.setValue(f"{self.plugin_key}/toolbar_show_toggle", show_toggle)
+
     def create_default_providers(self):
         """Create some default search providers as examples."""
         default_providers = [
@@ -234,7 +254,61 @@ class ConfigManager:
             "Advanced Search Panel",
             Qgis.Info
         )
-    
+
+    def save_project_providers(self, providers, parent_widget=None):
+        """Save a list of providers to the current QGIS project as a project variable.
+
+        Writes a JSON array to the 'search_providers' project variable so that
+        the providers travel with the .qgs/.qgz file and are loaded automatically
+        when the project is opened.
+
+        Args:
+            providers: List of provider dicts to save (must not contain _source keys).
+            parent_widget: Parent widget for error dialogs.
+
+        Returns:
+            True on success, False on failure.
+        """
+        try:
+            project = QgsProject.instance()
+            if not project.fileName():
+                from qgis.PyQt.QtWidgets import QMessageBox
+                QMessageBox.warning(
+                    parent_widget,
+                    "No Project Open",
+                    "There is no saved QGIS project open.\n\n"
+                    "Please save your project first, then try again."
+                )
+                return False
+
+            # Strip internal _source markers before saving
+            clean_providers = []
+            for p in providers:
+                clean = p.copy()
+                clean.pop("_source", None)
+                clean_providers.append(clean)
+
+            providers_json = json.dumps(clean_providers, indent=2, ensure_ascii=False)
+            QgsExpressionContextUtils.setProjectVariable(project, "search_providers", providers_json)
+
+            # Refresh in-memory project providers so they are visible immediately
+            self.project_providers = clean_providers
+
+            QgsMessageLog.logMessage(
+                f"Saved {len(clean_providers)} provider(s) to project variable 'search_providers'",
+                "Advanced Search Panel",
+                Qgis.Info
+            )
+            return True
+
+        except Exception as e:
+            error_msg = f"Failed to save providers to project: {str(e)}"
+            QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Critical)
+            if parent_widget:
+                from qgis.PyQt.QtWidgets import QMessageBox
+                QMessageBox.critical(parent_widget, "Save to Project Failed", error_msg)
+            return False
+
     def export_providers(self, file_path=None, parent_widget=None):
         """Export search providers to a JSON file."""
         try:

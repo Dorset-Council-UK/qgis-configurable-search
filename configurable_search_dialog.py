@@ -2,16 +2,15 @@ import os
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, QAbstractTableModel, QVariant, QModelIndex
 from qgis.PyQt.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget, 
-    QPushButton, QTableView, QLineEdit, QSpinBox, QCheckBox, 
+    QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
+    QPushButton, QTableView, QLineEdit, QSpinBox, QCheckBox,
     QComboBox, QTextEdit, QLabel, QGroupBox, QFormLayout,
     QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QDoubleSpinBox,
-    QToolBar
+    QListWidget, QListWidgetItem, QDialogButtonBox
 )
 from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem
 from qgis.core import QgsProject, QgsVectorLayer, QgsApplication
 from qgis.gui import QgsAuthConfigSelect
-from qgis.utils import iface as qgis_iface
 from .provider_templates import get_template_display_names, get_template_by_display_name, apply_template_to_provider
 from . import help as help_module
 
@@ -117,11 +116,11 @@ class AdvancedSearchPanelDialog(QDialog):
         self.export_providers_button = QPushButton("Export...")
         self.export_providers_button.clicked.connect(self.export_providers)
         self.export_providers_button.setToolTip("Export search providers to a file for backup or sharing")
-        
+
         self.import_providers_button = QPushButton("Import...")
         self.import_providers_button.clicked.connect(self.import_providers)
         self.import_providers_button.setToolTip("Import search providers from a file")
-        
+
         button_layout.addWidget(self.add_provider_button)
         button_layout.addWidget(self.edit_provider_button)
         button_layout.addWidget(self.remove_provider_button)
@@ -143,25 +142,10 @@ class AdvancedSearchPanelDialog(QDialog):
     
     def update_button_states(self):
         """Update the enabled state of edit/remove buttons based on selection."""
-        selected_rows = self.providers_table.selectionModel().selectedRows()
-        
-        if not selected_rows:
-            self.edit_provider_button.setEnabled(True)
-            self.remove_provider_button.setEnabled(True)
-            self.project_info_label.hide()
-            return
-        
-        row = selected_rows[0].row()
-        provider = self.providers_model.get_provider(row)
-        
-        # Disable edit and remove for project providers
-        is_project_provider = provider.get("_source") == "project" if provider else False
-        self.edit_provider_button.setEnabled(not is_project_provider)
-        self.remove_provider_button.setEnabled(not is_project_provider)
-        if is_project_provider:
-            self.project_info_label.show()
-        else:
-            self.project_info_label.hide()
+        has_selection = bool(self.providers_table.selectionModel().selectedRows())
+        self.edit_provider_button.setEnabled(has_selection)
+        self.remove_provider_button.setEnabled(has_selection)
+        self.project_info_label.hide()
         
     def create_settings_tab(self):
         """Create the general settings tab."""
@@ -172,14 +156,19 @@ class AdvancedSearchPanelDialog(QDialog):
         toolbar_group = QGroupBox("Toolbar")
         toolbar_layout = QFormLayout()
 
-        self.toolbar_combo = QComboBox()
-        self._populate_toolbar_combo()
-        toolbar_layout.addRow("Add icons to toolbar:", self.toolbar_combo)
+        self.toolbar_name_edit = QLineEdit()
+        self.toolbar_name_edit.setPlaceholderText("Leave empty to use the default Plugins toolbar")
+        toolbar_layout.addRow("Toolbar name:", self.toolbar_name_edit)
+
+        self.toolbar_show_configure_checkbox = QCheckBox("Show Configure button in toolbar")
+        toolbar_layout.addRow(self.toolbar_show_configure_checkbox)
+
+        self.toolbar_show_toggle_checkbox = QCheckBox("Show Toggle Panel button in toolbar")
+        toolbar_layout.addRow(self.toolbar_show_toggle_checkbox)
 
         toolbar_desc = QLabel(
-            "Leave as Default to use the QGIS Plugins toolbar. "
-            "Select an existing toolbar to add icons to it. "
-            "Type a new name to create a dedicated toolbar."
+            "Enter a name to create a dedicated toolbar for the plugin icons. "
+            "Leave empty to use the default Plugins toolbar."
         )
         toolbar_desc.setWordWrap(True)
         toolbar_desc.setStyleSheet("color: #666; font-style: italic; padding: 2px;")
@@ -234,34 +223,16 @@ class AdvancedSearchPanelDialog(QDialog):
         widget.setLayout(layout)
         return widget
 
-    def _populate_toolbar_combo(self):
-        """Populate the toolbar combo with available QGIS toolbars."""
-        self.toolbar_combo.clear()
-        self.toolbar_combo.addItem("Default (Plugins toolbar)", userData="")
-
-        if qgis_iface:
-            toolbars = qgis_iface.mainWindow().findChildren(QToolBar)
-            for toolbar in sorted(toolbars, key=lambda t: t.windowTitle().lower()):
-                obj_name = toolbar.objectName()
-                title = toolbar.windowTitle()
-                if obj_name:
-                    self.toolbar_combo.addItem(title, userData=obj_name)
-
-        self.toolbar_combo.setEditable(True)
-        self.toolbar_combo.setInsertPolicy(QComboBox.NoInsert)
-        self.toolbar_combo.lineEdit().setPlaceholderText("Select or type a toolbar name...")
-
     def load_config(self):
         """Load configuration into the UI."""
         # Load providers
         self.load_providers()
 
-        saved_toolbar_name = self.config_manager.get_toolbar_name()
-        index = self.toolbar_combo.findData(saved_toolbar_name)
-        if index >= 0:
-            self.toolbar_combo.setCurrentIndex(index)
-        else:
-            self.toolbar_combo.setCurrentText(saved_toolbar_name)
+        self.toolbar_name_edit.setText(self.config_manager.get_toolbar_name())
+
+        show_configure, show_toggle = self.config_manager.get_toolbar_buttons()
+        self.toolbar_show_configure_checkbox.setChecked(show_configure)
+        self.toolbar_show_toggle_checkbox.setChecked(show_toggle)
 
         # Load general settings
         self.stop_on_first_checkbox.setChecked(
@@ -305,8 +276,10 @@ class AdvancedSearchPanelDialog(QDialog):
         self.config["search_providers"] = global_providers
 
         # Save toolbar name — stored in QSettings directly, not in the JSON config
-        self.config_manager.set_toolbar_name(
-            self.toolbar_combo.currentData() or self.toolbar_combo.currentText().strip()
+        self.config_manager.set_toolbar_name(self.toolbar_name_edit.text().strip())
+        self.config_manager.set_toolbar_buttons(
+            self.toolbar_show_configure_checkbox.isChecked(),
+            self.toolbar_show_toggle_checkbox.isChecked()
         )
 
         # Save general settings
@@ -326,43 +299,67 @@ class AdvancedSearchPanelDialog(QDialog):
         dialog = ProviderEditDialog()
         if dialog.exec_() == QDialog.Accepted:
             provider = dialog.get_provider()
-            provider["_source"] = "global"  # New providers are always global
+            destination = dialog.get_destination()
+            if destination == "project":
+                # Save directly to project variable
+                existing = list(self.config_manager.project_providers or [])
+                existing.append(provider)
+                if not self.config_manager.save_project_providers(existing, parent_widget=self):
+                    return
+                provider["_source"] = "project"
+            else:
+                provider["_source"] = "global"
             self.providers_model.add_provider(provider)
             
     def edit_provider(self, index=None):
         """Edit the selected provider.
-        
+
         Args:
             index: QModelIndex from double-click signal (optional)
         """
-        # Handle different types of index parameter
         if index is not None and hasattr(index, 'isValid') and index.isValid():
-            # Called from double-click with valid QModelIndex
             row = index.row()
         else:
-            # Called from button or with invalid/unexpected parameter, get selected row
             selected_rows = self.providers_table.selectionModel().selectedRows()
             if not selected_rows:
                 QMessageBox.information(self, "No Selection", "Please select a provider to edit.")
                 return
             row = selected_rows[0].row()
-        
+
         provider = self.providers_model.get_provider(row)
-        
-        # Check if this is a project provider
-        if provider.get("_source") == "project":
-            QMessageBox.information(
-                self,
-                "Cannot Edit Project Provider",
-                "This provider is loaded from the QGIS project properties and cannot be edited here.\n\n"
-                "To modify project providers, you need to update the project's 'search_providers' variable."
-            )
-            return
-        
+        original_source = provider.get("_source", "global")
+
         dialog = ProviderEditDialog(provider)
-        if dialog.exec_() == QDialog.Accepted:
-            updated_provider = dialog.get_provider()
-            updated_provider["_source"] = "global"  # Maintain source
+        if dialog.exec_() != QDialog.Accepted:
+            return
+
+        updated_provider = dialog.get_provider()
+        new_destination = dialog.get_destination()
+
+        if original_source == new_destination:
+            # Same store — simple in-place update
+            updated_provider["_source"] = original_source
+            self.providers_model.update_provider(row, updated_provider)
+            if original_source == "project":
+                # Persist the whole project providers list
+                all_providers = self.providers_model.get_providers()
+                project_providers = [p for p in all_providers if p.get("_source") == "project"]
+                self.config_manager.save_project_providers(project_providers, parent_widget=self)
+        elif original_source == "global" and new_destination == "project":
+            # Moving global → project: remove from table (global), add to project store
+            self.providers_model.remove_provider(row)
+            existing = list(self.config_manager.project_providers or [])
+            existing.append(updated_provider)
+            if not self.config_manager.save_project_providers(existing, parent_widget=self):
+                return
+            updated_provider["_source"] = "project"
+            self.providers_model.add_provider(updated_provider)
+        else:
+            # Moving project → global: remove from project store, keep in table as global
+            existing = [p for p in (self.config_manager.project_providers or [])
+                        if p.get("name") != provider.get("name")]
+            self.config_manager.save_project_providers(existing, parent_widget=self)
+            updated_provider["_source"] = "global"
             self.providers_model.update_provider(row, updated_provider)
             
     def remove_provider(self):
@@ -374,26 +371,21 @@ class AdvancedSearchPanelDialog(QDialog):
             
         row = selected_rows[0].row()
         provider = self.providers_model.get_provider(row)
-        
-        # Check if this is a project provider
-        if provider.get("_source") == "project":
-            QMessageBox.information(
-                self,
-                "Cannot Remove Project Provider",
-                "This provider is loaded from the QGIS project properties and cannot be removed here.\n\n"
-                "To remove project providers, you need to update the project's 'search_providers' variable."
-            )
-            return
-        
+
         reply = QMessageBox.question(
-            self, 
-            "Remove Provider", 
+            self,
+            "Remove Provider",
             f"Are you sure you want to remove the provider '{provider.get('name', 'Unknown')}'?",
             QMessageBox.Yes | QMessageBox.No
         )
-        
+
         if reply == QMessageBox.Yes:
             self.providers_model.remove_provider(row)
+            if provider.get("_source") == "project":
+                # Also remove from the project variable
+                existing = [p for p in (self.config_manager.project_providers or [])
+                            if p.get("name") != provider.get("name")]
+                self.config_manager.save_project_providers(existing, parent_widget=self)
             
     def move_provider_up(self):
         """Move the selected provider up in priority."""
@@ -459,11 +451,45 @@ class AdvancedSearchPanelDialog(QDialog):
         if self.config_manager.import_providers(parent_widget=self, merge_mode=merge_mode):
             # Reload the providers in the UI
             self.load_providers()
-            
+
+    def save_to_project(self):
+        """Save the current global providers to the QGIS project variable."""
+        all_providers = self.providers_model.get_providers()
+        global_providers = [p for p in all_providers if p.get("_source") != "project"]
+
+        if not global_providers:
+            QMessageBox.information(
+                self,
+                "No Global Providers",
+                "There are no global providers to save to the project."
+            )
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Save to Project",
+            f"Save {len(global_providers)} global provider(s) to the current QGIS project?\n\n"
+            "This will overwrite any providers already stored in the project.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply != QMessageBox.Yes:
+            return
+
+        if self.config_manager.save_project_providers(global_providers, parent_widget=self):
+            QMessageBox.information(
+                self,
+                "Saved to Project",
+                f"{len(global_providers)} provider(s) saved to the project.\n\n"
+                "Remember to save the project file to persist this change."
+            )
+            # Reload to show the newly written project providers
+            self.load_providers()
+
     def apply_changes(self):
         """Apply changes without closing the dialog."""
         self.save_config()
-        
+
     def accept(self):
         """Accept and save changes."""
         self.save_config()
@@ -767,27 +793,43 @@ class ProviderEditDialog(QDialog):
         
         # Buttons
         button_layout = QHBoxLayout()
-        
+
         # Help button on the left
         self.help_button = QPushButton("Help")
         self.help_button.clicked.connect(self.show_help)
         self.help_button.setToolTip("Open help documentation for Layer-Based Providers")
         button_layout.addWidget(self.help_button)
-        
+
         button_layout.addStretch()
-        
-        self.ok_button = QPushButton("OK")
-        self.ok_button.clicked.connect(self.accept)
-        
+
+        self._destination = "global"  # Set by whichever save button is clicked
+
+        original_source = self.provider.get("_source", "global")
+
+        self.save_global_button = QPushButton("Save Globally")
+        self.save_global_button.setToolTip("Save this provider to your local QGIS settings (available in all projects)")
+        self.save_global_button.clicked.connect(self._accept_global)
+
+        self.save_project_button = QPushButton("Save to Project")
+        self.save_project_button.setToolTip("Save this provider to the current QGIS project file only")
+        self.save_project_button.clicked.connect(self._accept_project)
+
+        # Highlight the button matching the provider's current source
+        if original_source == "project":
+            self.save_project_button.setDefault(True)
+        else:
+            self.save_global_button.setDefault(True)
+
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.clicked.connect(self.reject)
-        
-        button_layout.addWidget(self.ok_button)
+
+        button_layout.addWidget(self.save_global_button)
+        button_layout.addWidget(self.save_project_button)
         button_layout.addWidget(self.cancel_button)
-        
+
         layout.addLayout(button_layout)
         self.setLayout(layout)
-        
+
         # Initial visibility update
         self.on_type_changed()
         self.on_method_changed()
@@ -1067,6 +1109,20 @@ class ProviderEditDialog(QDialog):
         
         return provider
     
+    def _accept_global(self):
+        """Accept the dialog with 'global' as the save destination."""
+        self._destination = "global"
+        self.accept()
+
+    def _accept_project(self):
+        """Accept the dialog with 'project' as the save destination."""
+        self._destination = "project"
+        self.accept()
+
+    def get_destination(self):
+        """Return 'global' or 'project' depending on which save button was clicked."""
+        return self._destination
+
     def show_help(self):
         """Open the help documentation."""
         help_module.show_help()

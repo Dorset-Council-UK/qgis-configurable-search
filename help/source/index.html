@@ -20,6 +20,7 @@
         <li><a href="#installation">Installation</a></li>
         <li><a href="#getting-started">Getting Started</a></li>
         <li><a href="#configuration">Configuration</a></li>
+        <li><a href="#provider-scope">Provider Scope: Global vs Project</a></li>
         <li><a href="#templates">API Provider Templates</a></li>
         <li><a href="#layer-providers">Layer-Based Providers</a></li>
         <li><a href="#import-export">Import/Export Configuration</a></li>
@@ -40,6 +41,7 @@
         <li><strong>Layer-Based Search:</strong> Search within your project layers and feature attributes</li>
         <li><strong>Pre-configured Templates:</strong> Quick setup for popular geocoding services</li>
         <li><strong>Flexible Configuration:</strong> Support for GET/POST requests, custom headers, and authentication</li>
+        <li><strong>Global &amp; Project Providers:</strong> Store providers in your personal QGIS settings or embed them in a project file for team sharing</li>
         <li><strong>Import/Export:</strong> Backup and share configurations</li>
         <li><strong>Regular Expression Filtering:</strong> Fine-tune search results</li>
       </ul>
@@ -85,11 +87,13 @@
       <h3>Search Providers Tab</h3>
       <p>
         Configure your search providers including API endpoints, authentication, and result parsing.
+        Each provider has a <strong>Source</strong> column showing whether it is stored globally (black text)
+        or embedded in the current project (blue text).
       </p>
       <ul>
-        <li><strong>Add Provider:</strong> Create new search providers</li>
-        <li><strong>Edit Provider:</strong> Modify existing providers (double-click or use Edit button)</li>
-        <li><strong>Remove Provider:</strong> Delete unwanted providers</li>
+        <li><strong>Add Provider:</strong> Create new search providers — choose to save globally or to the project</li>
+        <li><strong>Edit Provider:</strong> Modify any provider (double-click or use Edit button) — you can also move it between global and project storage</li>
+        <li><strong>Remove Provider:</strong> Delete providers from either source</li>
         <li><strong>Reorder:</strong> Change search priority with Move Up/Down buttons</li>
         <li><strong>Import/Export:</strong> Backup and share configurations</li>
       </ul>
@@ -102,6 +106,79 @@
         <li><strong>Search Behavior:</strong> Stop on first result, result limits, timeouts</li>
         <li><strong>Zoom Settings:</strong> Configure zoom behavior for different coordinate systems</li>
       </ul>
+
+      <h2 id="provider-scope">Provider Scope: Global vs Project</h2>
+      <p>
+        Every search provider belongs to one of two scopes that control where its configuration is stored
+        and who can see it.
+      </p>
+
+      <h3>Global Providers</h3>
+      <p>
+        Global providers are saved in your personal QGIS settings (the Windows registry or equivalent on
+        other platforms). They are available in <strong>every</strong> project you open but are only visible
+        to you on your own machine.
+      </p>
+      <ul>
+        <li>Shown in <strong>black</strong> text in the Source column</li>
+        <li>Persisted across all QGIS projects on this machine</li>
+        <li>Not shared automatically — use Export/Import to distribute to colleagues</li>
+      </ul>
+
+      <h3>Project Providers</h3>
+      <p>
+        Project providers are stored as a <code>search_providers</code> variable inside the
+        <code>.qgs</code> / <code>.qgz</code> project file. They travel with the project and are
+        automatically available to anyone who opens it, making them ideal for team deployments.
+      </p>
+      <ul>
+        <li>Shown in <strong>blue</strong> text in the Source column</li>
+        <li>Loaded automatically when the project is opened</li>
+        <li>Cleared automatically when the project is closed or a new project is started</li>
+        <li>Shared with anyone who receives the project file</li>
+        <li>Require the project file to be saved after adding or editing them</li>
+      </ul>
+
+      <h3>Adding a Provider to a Specific Scope</h3>
+      <ol>
+        <li>Click <strong>Add Provider</strong> in the Search Providers tab</li>
+        <li>Fill in the provider details as normal</li>
+        <li>At the bottom of the dialog, click either:
+          <ul>
+            <li><strong>Save Globally</strong> — stores the provider in your local QGIS settings</li>
+            <li><strong>Save to Project</strong> — stores the provider in the current project file</li>
+          </ul>
+        </li>
+      </ol>
+      <p>
+        <strong>Note:</strong> <em>Save to Project</em> requires a QGIS project to be open and saved.
+        Remember to save your project file afterwards to persist the change.
+      </p>
+
+      <h3>Editing a Provider and Changing Its Scope</h3>
+      <p>
+        You can move a provider between global and project storage at any time by editing it and
+        clicking the opposite save button.
+      </p>
+      <ul>
+        <li><strong>Global → Project:</strong> Open the provider, click <em>Save to Project</em>.
+          The provider is removed from global settings and written into the project file.</li>
+        <li><strong>Project → Global:</strong> Open the provider, click <em>Save Globally</em>.
+          The provider is removed from the project file and saved to your local settings.</li>
+        <li><strong>Same scope:</strong> Click the button that matches the current source to
+          update the provider in place without moving it.</li>
+      </ul>
+      <p>
+        The default button in the edit dialog is pre-selected to match the provider's current scope,
+        so pressing Enter will save it back to the same place unless you intentionally choose the other button.
+      </p>
+
+      <h3>Deleting a Project Provider</h3>
+      <p>
+        Select the provider in the table and click <strong>Remove Provider</strong>. The provider is
+        removed from both the table and the project variable immediately. Save the project file to make
+        the deletion permanent.
+      </p>
 
       <h2 id="templates">API Provider Templates</h2>
       <p>
