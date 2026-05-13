@@ -1,6 +1,6 @@
 # Contributing to the Advanced Search Panel plugin
 
-Thanks for your interest in contributing to the Advanced Search Panel plugin. Please see the project's [Code of Conduct](https://github.com/Dorset-Council-UK/qgis-configurable-search/blob/main/CODE_OF_CONDUCT.md) before proceeding.
+Thanks for your interest in contributing to the Advanced Search Panel plugin. Please see the project's [Code of Conduct](https://github.com/Dorset-Council-UK/qgis-configurable-search/blob/main/CODE_OF_CONDUCT.md) and [AI Policy](./AI_POLICY.md) before proceeding.
 
 ## Submitting Bug Reports
 
