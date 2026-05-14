@@ -49,15 +49,10 @@ class AdvancedSearchPanel:
         # Declare instance attributes
         self.actions = []
         self.menu = self.tr(u'&Advanced Search Panel')
-        self.toolbar = None
         self._toolbar = None
         self.search_widget = None
         self.config_manager = ConfigManager()
         self.search_engine = SearchEngine(self.config_manager)
-        
-        # Check if plugin was started the first time in current QGIS session
-        # Must be set in initGui() to survive plugin reloads
-        self.first_start = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -196,17 +191,14 @@ class AdvancedSearchPanel:
             add_to_toolbar=False)
 
         # Create search dock widget
-        self.create_search_widget()
-        
+        self.create_search_widget()        self.create_search_widget()
+
         # Connect to project signals for loading project-specific providers
         QgsProject.instance().readProject.connect(self.on_project_read)
         QgsProject.instance().cleared.connect(self.on_project_cleared)
-        
+
         # Load project providers if a project is already loaded
         self.on_project_read()
-        
-        # will be set False in run()
-        self.first_start = True
 
     def on_project_read(self):
         """Handle project read event - load project-specific search providers."""
@@ -307,9 +299,6 @@ class AdvancedSearchPanel:
 
     def show_config_dialog(self):
         """Show the configuration dialog."""
-        if self.first_start == True:
-            self.first_start = False
-            
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if hasattr(self, 'dlg') and self.dlg:

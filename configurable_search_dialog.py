@@ -1,4 +1,5 @@
 import os
+import uuid
 from qgis.PyQt import uic
 from qgis.PyQt.QtCore import Qt, QAbstractTableModel, QVariant, QModelIndex
 from qgis.PyQt.QtWidgets import (
@@ -294,11 +295,33 @@ class AdvancedSearchPanelDialog(QDialog):
         # Save to config manager
         self.config_manager.save_config(self.config)
         
+    @staticmethod
+    def _provider_matches(p, provider_id, provider_name):
+        """Return True if provider p matches by id (preferred) or name (fallback)."""
+        if provider_id and p.get("id"):
+            return p["id"] == provider_id
+        return p.get("name") == provider_name
+
+    def _check_name_unique(self, name, exclude_id=None):
+        """Return True if no other provider in the model already uses *name*."""
+        for p in self.providers_model.get_providers():
+            if p.get("name") == name and p.get("id") != exclude_id:
+                return False
+        return True
+
     def add_provider(self):
         """Add a new search provider."""
         dialog = ProviderEditDialog()
         if dialog.exec_() == QDialog.Accepted:
             provider = dialog.get_provider()
+            if not self._check_name_unique(provider["name"]):
+                QMessageBox.warning(
+                    self,
+                    "Duplicate Name",
+                    f"A provider named '{provider['name']}' already exists. "
+                    "Please use a unique name."
+                )
+                return
             destination = dialog.get_destination()
             if destination == "project":
                 # Save directly to project variable
@@ -336,6 +359,16 @@ class AdvancedSearchPanelDialog(QDialog):
         updated_provider = dialog.get_provider()
         new_destination = dialog.get_destination()
 
+        # Validate name uniqueness (allow keeping the same name on the same provider)
+        if not self._check_name_unique(updated_provider["name"], exclude_id=updated_provider.get("id")):
+            QMessageBox.warning(
+                self,
+                "Duplicate Name",
+                f"A provider named '{updated_provider['name']}' already exists. "
+                "Please use a unique name."
+            )
+            return
+
         if original_source == new_destination:
             # Same store — simple in-place update
             updated_provider["_source"] = original_source
@@ -343,21 +376,28 @@ class AdvancedSearchPanelDialog(QDialog):
             if original_source == "project":
                 # Persist the whole project providers list
                 all_providers = self.providers_model.get_providers()
-                project_providers = [p for p in all_providers if p.get("_source") == "project"]
+                project_providers = [
+                    {k: v for k, v in p.items() if k != "_source"}
+                    for p in all_providers if p.get("_source") == "project"
+                ]
                 self.config_manager.save_project_providers(project_providers, parent_widget=self)
         elif original_source == "global" and new_destination == "project":
-            # Moving global → project: remove from table (global), add to project store
-            self.providers_model.remove_provider(row)
+            # Moving global → project: persist first, then mutate the model
             existing = list(self.config_manager.project_providers or [])
-            existing.append(updated_provider)
+            existing.append({k: v for k, v in updated_provider.items() if k != "_source"})
             if not self.config_manager.save_project_providers(existing, parent_widget=self):
                 return
+            self.providers_model.remove_provider(row)
             updated_provider["_source"] = "project"
             self.providers_model.add_provider(updated_provider)
         else:
             # Moving project → global: remove from project store, keep in table as global
-            existing = [p for p in (self.config_manager.project_providers or [])
-                        if p.get("name") != provider.get("name")]
+            provider_id = provider.get("id")
+            provider_name = provider.get("name")
+            existing = [
+                p for p in (self.config_manager.project_providers or [])
+                if not self._provider_matches(p, provider_id, provider_name)
+            ]
             self.config_manager.save_project_providers(existing, parent_widget=self)
             updated_provider["_source"] = "global"
             self.providers_model.update_provider(row, updated_provider)
@@ -383,8 +423,12 @@ class AdvancedSearchPanelDialog(QDialog):
             self.providers_model.remove_provider(row)
             if provider.get("_source") == "project":
                 # Also remove from the project variable
-                existing = [p for p in (self.config_manager.project_providers or [])
-                            if p.get("name") != provider.get("name")]
+                provider_id = provider.get("id")
+                provider_name = provider.get("name")
+                existing = [
+                    p for p in (self.config_manager.project_providers or [])
+                    if not self._provider_matches(p, provider_id, provider_name)
+                ]
                 self.config_manager.save_project_providers(existing, parent_widget=self)
             
     def move_provider_up(self):
@@ -396,8 +440,6 @@ class AdvancedSearchPanelDialog(QDialog):
         row = selected_rows[0].row()
         if row > 0:
             self.providers_model.move_provider(row, row - 1)
-            # Update selection
-            new_index = self.providers_model.index(row - 1, 0)
             self.providers_table.selectRow(row - 1)
             
     def move_provider_down(self):
@@ -414,9 +456,7 @@ class AdvancedSearchPanelDialog(QDialog):
     
     def export_providers(self):
         """Export search providers to a file."""
-        if self.config_manager.export_providers(parent_widget=self):
-            # The export was successful, config_manager already shows success message
-            pass
+        self.config_manager.export_providers(parent_widget=self)
     
     def import_providers(self):
         """Import search providers from a file."""
@@ -450,40 +490,6 @@ class AdvancedSearchPanelDialog(QDialog):
         
         if self.config_manager.import_providers(parent_widget=self, merge_mode=merge_mode):
             # Reload the providers in the UI
-            self.load_providers()
-
-    def save_to_project(self):
-        """Save the current global providers to the QGIS project variable."""
-        all_providers = self.providers_model.get_providers()
-        global_providers = [p for p in all_providers if p.get("_source") != "project"]
-
-        if not global_providers:
-            QMessageBox.information(
-                self,
-                "No Global Providers",
-                "There are no global providers to save to the project."
-            )
-            return
-
-        reply = QMessageBox.question(
-            self,
-            "Save to Project",
-            f"Save {len(global_providers)} global provider(s) to the current QGIS project?\n\n"
-            "This will overwrite any providers already stored in the project.",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
-        if reply != QMessageBox.Yes:
-            return
-
-        if self.config_manager.save_project_providers(global_providers, parent_widget=self):
-            QMessageBox.information(
-                self,
-                "Saved to Project",
-                f"{len(global_providers)} provider(s) saved to the project.\n\n"
-                "Remember to save the project file to persist this change."
-            )
-            # Reload to show the newly written project providers
             self.load_providers()
 
     def apply_changes(self):
@@ -1064,6 +1070,7 @@ class ProviderEditDialog(QDialog):
             provider_type = selected_type.lower()
         
         provider = {
+            "id": self.provider.get("id") or str(uuid.uuid4()),
             "name": self.name_edit.text(),
             "provider_type": provider_type,
             "enabled": self.enabled_checkbox.isChecked(),
