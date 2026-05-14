@@ -5,8 +5,7 @@ from qgis.PyQt.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QTabWidget, QWidget,
     QPushButton, QTableView, QLineEdit, QSpinBox, QCheckBox,
     QComboBox, QTextEdit, QLabel, QGroupBox, QFormLayout,
-    QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QDoubleSpinBox,
-    QListWidget, QListWidgetItem, QDialogButtonBox
+    QHeaderView, QAbstractItemView, QMessageBox, QInputDialog, QDoubleSpinBox
 )
 from qgis.PyQt.QtGui import QStandardItemModel, QStandardItem
 from qgis.core import QgsProject, QgsVectorLayer, QgsApplication
