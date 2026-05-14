@@ -1,16 +1,15 @@
 import json
 import os
 from datetime import datetime
-from qgis.PyQt.QtCore import QSettings
 from qgis.PyQt.QtWidgets import QFileDialog, QMessageBox
-from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsExpressionContextUtils
+from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsExpressionContextUtils, QgsSettings
 
 
 class ConfigManager:
     """Manages plugin configuration and settings."""
     
     def __init__(self):
-        self.settings = QSettings()
+        self.settings = QgsSettings()
         self.plugin_key = "configurable_search"
         self.default_config = {
             "search_providers": [],
@@ -23,11 +22,21 @@ class ConfigManager:
         self.project_providers = None  # To hold project-specific providers if imported
         
     def get_config(self):
-        """Get the complete configuration."""
+        """Get the complete configuration.
+
+        Merges stored settings with defaults so that:
+        - Pre-seeded values in qgis3.ini (enterprise deployments) are respected.
+        - Keys added in newer plugin versions always have a fallback value.
+        """
         config_str = self.settings.value(f"{self.plugin_key}/config", "")
         if config_str:
             try:
-                return json.loads(config_str)
+                stored = json.loads(config_str)
+                # Merge: defaults first, then stored values override them.
+                # This ensures missing keys always resolve to their default.
+                merged = self.default_config.copy()
+                merged.update(stored)
+                return merged
             except (json.JSONDecodeError, TypeError):
                 pass
         return self.default_config.copy()
