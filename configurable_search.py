@@ -191,7 +191,7 @@ class AdvancedSearchPanel:
             add_to_toolbar=False)
 
         # Create search dock widget
-        self.create_search_widget()        self.create_search_widget()
+        self.create_search_widget()
 
         # Connect to project signals for loading project-specific providers
         QgsProject.instance().readProject.connect(self.on_project_read)
