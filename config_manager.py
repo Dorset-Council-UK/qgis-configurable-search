@@ -1,16 +1,15 @@
 import json
 import os
 from datetime import datetime
-from qgis.PyQt.QtCore import QSettings
 from qgis.PyQt.QtWidgets import QFileDialog, QMessageBox
-from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsExpressionContextUtils
+from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsExpressionContextUtils, QgsSettings
 
 
 class ConfigManager:
     """Manages plugin configuration and settings."""
     
     def __init__(self):
-        self.settings = QSettings()
+        self.settings = QgsSettings()
         self.plugin_key = "configurable_search"
         self.default_config = {
             "search_providers": [],
@@ -23,11 +22,21 @@ class ConfigManager:
         self.project_providers = None  # To hold project-specific providers if imported
         
     def get_config(self):
-        """Get the complete configuration."""
+        """Get the complete configuration.
+
+        Merges stored settings with defaults so that:
+        - Pre-seeded values in qgis3.ini (enterprise deployments) are respected.
+        - Keys added in newer plugin versions always have a fallback value.
+        """
         config_str = self.settings.value(f"{self.plugin_key}/config", "")
         if config_str:
             try:
-                return json.loads(config_str)
+                stored = json.loads(config_str)
+                # Merge: defaults first, then stored values override them.
+                # This ensures missing keys always resolve to their default.
+                merged = self.default_config.copy()
+                merged.update(stored)
+                return merged
             except (json.JSONDecodeError, TypeError):
                 pass
         return self.default_config.copy()
@@ -81,7 +90,43 @@ class ConfigManager:
         config = self.get_config()
         config[key] = value
         self.save_config(config)
-        
+
+    def get_toolbar_name(self):
+        """Get the configured toolbar name.
+
+        Stored as a standalone QSettings key, not in the exported JSON config,
+        so it is local to this machine and never committed to source control.
+        """
+        return self.settings.value(f"{self.plugin_key}/toolbar_name", "")
+
+    def set_toolbar_name(self, toolbar_name):
+        """Set the configured toolbar name.
+
+        Stored as a standalone QSettings key, not in the exported JSON config,
+        so it is local to this machine and never committed to source control.
+        """
+        self.settings.setValue(f"{self.plugin_key}/toolbar_name", toolbar_name)
+
+    def get_toolbar_buttons(self):
+        """Get which action buttons are shown in the toolbar.
+
+        Returns a (show_configure, show_toggle) tuple of bools.
+        Stored in QSettings, local to this machine.
+        """
+        show_configure = self.settings.value(
+            f"{self.plugin_key}/toolbar_show_configure", True, type=bool)
+        show_toggle = self.settings.value(
+            f"{self.plugin_key}/toolbar_show_toggle", True, type=bool)
+        return show_configure, show_toggle
+
+    def set_toolbar_buttons(self, show_configure, show_toggle):
+        """Set which action buttons are shown in the toolbar.
+
+        Stored in QSettings, local to this machine.
+        """
+        self.settings.setValue(f"{self.plugin_key}/toolbar_show_configure", show_configure)
+        self.settings.setValue(f"{self.plugin_key}/toolbar_show_toggle", show_toggle)
+
     def create_default_providers(self):
         """Create some default search providers as examples."""
         default_providers = [
@@ -218,7 +263,61 @@ class ConfigManager:
             "Advanced Search Panel",
             Qgis.Info
         )
-    
+
+    def save_project_providers(self, providers, parent_widget=None):
+        """Save a list of providers to the current QGIS project as a project variable.
+
+        Writes a JSON array to the 'search_providers' project variable so that
+        the providers travel with the .qgs/.qgz file and are loaded automatically
+        when the project is opened.
+
+        Args:
+            providers: List of provider dicts to save (must not contain _source keys).
+            parent_widget: Parent widget for error dialogs.
+
+        Returns:
+            True on success, False on failure.
+        """
+        try:
+            project = QgsProject.instance()
+            if not project.fileName():
+                from qgis.PyQt.QtWidgets import QMessageBox
+                QMessageBox.warning(
+                    parent_widget,
+                    "No Project Open",
+                    "There is no saved QGIS project open.\n\n"
+                    "Please save your project first, then try again."
+                )
+                return False
+
+            # Strip internal _source markers before saving
+            clean_providers = []
+            for p in providers:
+                clean = p.copy()
+                clean.pop("_source", None)
+                clean_providers.append(clean)
+
+            providers_json = json.dumps(clean_providers, indent=2, ensure_ascii=False)
+            QgsExpressionContextUtils.setProjectVariable(project, "search_providers", providers_json)
+
+            # Refresh in-memory project providers so they are visible immediately
+            self.project_providers = clean_providers
+
+            QgsMessageLog.logMessage(
+                f"Saved {len(clean_providers)} provider(s) to project variable 'search_providers'",
+                "Advanced Search Panel",
+                Qgis.Info
+            )
+            return True
+
+        except Exception as e:
+            error_msg = f"Failed to save providers to project: {str(e)}"
+            QgsMessageLog.logMessage(error_msg, "Advanced Search Panel", Qgis.Critical)
+            if parent_widget:
+                from qgis.PyQt.QtWidgets import QMessageBox
+                QMessageBox.critical(parent_widget, "Save to Project Failed", error_msg)
+            return False
+
     def export_providers(self, file_path=None, parent_widget=None):
         """Export search providers to a JSON file."""
         try:

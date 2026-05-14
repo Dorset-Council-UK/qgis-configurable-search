@@ -2,7 +2,7 @@ import os
 import sys
 from qgis.PyQt.QtCore import QSettings, QTranslator, QCoreApplication, Qt, QThread, pyqtSignal, QTimer
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy, QDockWidget
+from qgis.PyQt.QtWidgets import QAction, QComboBox, QLineEdit, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QFrame, QSizePolicy, QDockWidget, QToolBar, QPushButton
 from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsGeometry, QgsRectangle, QgsCoordinateReferenceSystem, QgsCoordinateTransform, QgsPointXY
 from qgis.gui import QgsGui
 
@@ -11,7 +11,6 @@ from .resources import *
 from .configurable_search_dialog import AdvancedSearchPanelDialog
 from .search_engine import SearchEngine
 from .config_manager import ConfigManager
-from . import help
 from . import help
 
 
@@ -50,14 +49,10 @@ class AdvancedSearchPanel:
         # Declare instance attributes
         self.actions = []
         self.menu = self.tr(u'&Advanced Search Panel')
-        self.toolbar = None
+        self._toolbar = None
         self.search_widget = None
         self.config_manager = ConfigManager()
         self.search_engine = SearchEngine(self.config_manager)
-        
-        # Check if plugin was started the first time in current QGIS session
-        # Must be set in initGui() to survive plugin reloads
-        self.first_start = None
 
     # noinspection PyMethodMayBeStatic
     def tr(self, message):
@@ -73,6 +68,20 @@ class AdvancedSearchPanel:
         """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('AdvancedSearchPanel', message)
+
+    def _get_configured_toolbar(self):
+        """Get the dedicated toolbar for plugin icons, creating it if needed.
+
+        Returns the toolbar if a name is configured, or None to use the
+        default Plugins toolbar.
+        """
+        toolbar_name = self.config_manager.get_toolbar_name()
+        if not toolbar_name:
+            return None
+        if self._toolbar is None:
+            self._toolbar = self.iface.mainWindow().addToolBar(toolbar_name)
+            self._toolbar.setObjectName(toolbar_name)
+        return self._toolbar
 
     def add_action(
         self,
@@ -133,8 +142,11 @@ class AdvancedSearchPanel:
             action.setWhatsThis(whats_this)
 
         if add_to_toolbar:
-            # Adds plugin icon to Plugins toolbar
-            self.iface.addToolBarIcon(action)
+            configured_toolbar = self._get_configured_toolbar()
+            if configured_toolbar:
+                configured_toolbar.addAction(action)
+            else:
+                self.iface.addToolBarIcon(action)  # Adds plugin icon to Plugins toolbar
 
         if add_to_menu:
             self.iface.addPluginToMenu(
@@ -151,19 +163,23 @@ class AdvancedSearchPanel:
         config_icon_path = os.path.join(self.plugin_dir, 'icon-mono-configure.svg')
         search_icon_path = os.path.join(self.plugin_dir, 'icon-mono-search.svg')
         help_icon_path = os.path.join(self.plugin_dir, 'icon-mono-help.svg')
-        
+
+        show_configure, show_toggle = self.config_manager.get_toolbar_buttons()
+
         # Add configuration action
         self.add_action(
             config_icon_path,
             text=self.tr(u'Configure Advanced Search'),
             callback=self.show_config_dialog,
+            add_to_toolbar=show_configure,
             parent=self.iface.mainWindow())
-        
+
         # Add toggle panel action
         self.add_action(
             search_icon_path,
             text=self.tr(u'Toggle Advanced Search Panel'),
             callback=self.toggle_search_panel,
+            add_to_toolbar=show_toggle,
             parent=self.iface.mainWindow())
             
         # Add help action
@@ -176,16 +192,13 @@ class AdvancedSearchPanel:
 
         # Create search dock widget
         self.create_search_widget()
-        
+
         # Connect to project signals for loading project-specific providers
         QgsProject.instance().readProject.connect(self.on_project_read)
         QgsProject.instance().cleared.connect(self.on_project_cleared)
-        
+
         # Load project providers if a project is already loaded
         self.on_project_read()
-        
-        # will be set False in run()
-        self.first_start = True
 
     def on_project_read(self):
         """Handle project read event - load project-specific search providers."""
@@ -230,7 +243,11 @@ class AdvancedSearchPanel:
     def create_search_widget(self):
         """Create the search dock widget panel."""
         # Create search widget
-        self.search_widget = SearchWidget(self.search_engine, self.config_manager, self.iface)
+        self.search_widget = SearchWidget(
+            self.search_engine, self.config_manager, self.iface,
+            open_config_callback=self.show_config_dialog,
+            plugin_dir=self.plugin_dir
+        )
         
         # Create dock widget
         self.dock_widget = QDockWidget("Advanced Search Panel", self.iface.mainWindow())
@@ -245,12 +262,24 @@ class AdvancedSearchPanel:
         self.iface.addDockWidget(Qt.LeftDockWidgetArea, self.dock_widget)
         
     def toggle_search_panel(self):
-        """Toggle the visibility of the search panel."""
-        if hasattr(self, 'dock_widget') and self.dock_widget:
-            if self.dock_widget.isVisible():
-                self.dock_widget.hide()
-            else:
-                self.dock_widget.show()
+        """Toggle the visibility of the search panel.
+
+        - If the dock is hidden, show it.
+        - If the dock is visible but not the active tab (e.g. docked behind
+          the Layers panel), raise it to the front.
+        - If the dock is visible and already the active tab, hide it.
+        """
+        if not (hasattr(self, 'dock_widget') and self.dock_widget):
+            return
+
+        if not self.dock_widget.isVisible():
+            self.dock_widget.show()
+            self.dock_widget.raise_()
+        elif self.dock_widget.visibleRegion().isEmpty():
+            # Visible but obscured by another tab — bring it to the front
+            self.dock_widget.raise_()
+        else:
+            self.dock_widget.hide()
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -265,8 +294,15 @@ class AdvancedSearchPanel:
             self.iface.removePluginMenu(
                 self.tr(u'&Advanced Search Panel'),
                 action)
-            self.iface.removeToolBarIcon(action)
-        
+            if self._toolbar:
+                self._toolbar.removeAction(action)
+            else:
+                self.iface.removeToolBarIcon(action)
+
+        if self._toolbar is not None:
+            self.iface.mainWindow().removeToolBar(self._toolbar)
+            self._toolbar = None
+
         # Remove the dock widget
         if hasattr(self, 'dock_widget') and self.dock_widget:
             self.iface.removeDockWidget(self.dock_widget)
@@ -274,9 +310,6 @@ class AdvancedSearchPanel:
 
     def show_config_dialog(self):
         """Show the configuration dialog."""
-        if self.first_start == True:
-            self.first_start = False
-            
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if hasattr(self, 'dlg') and self.dlg:
@@ -304,12 +337,14 @@ class AdvancedSearchPanel:
 
 class SearchWidget(QWidget):
     """Custom search widget for the toolbar with results dropdown."""
-    
-    def __init__(self, search_engine, config_manager, iface):
+
+    def __init__(self, search_engine, config_manager, iface, open_config_callback=None, plugin_dir=None):
         super().__init__()
         self.search_engine = search_engine
         self.config_manager = config_manager
         self.iface = iface
+        self.open_config_callback = open_config_callback
+        self.plugin_dir = plugin_dir or ""
         self.current_results = []
         
         # Set size policy for panel (allow expansion)
@@ -330,11 +365,24 @@ class SearchWidget(QWidget):
         search_layout = QHBoxLayout()
         search_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Panel title/header
+        # Panel header with title and settings button
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
         panel_title = QLabel("🔍 Search")
         panel_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #333; margin-bottom: 5px;")
-        main_layout.addWidget(panel_title)
-        
+        header_layout.addWidget(panel_title)
+        header_layout.addStretch()
+        self.settings_button = QPushButton()
+        self.settings_button.setToolTip("Configure Advanced Search")
+        self.settings_button.setFixedSize(24, 24)
+        self.settings_button.setStyleSheet("QPushButton { border: none; } QPushButton:hover { background-color: rgba(0,0,0,20); border-radius: 3px; }")
+        config_icon_path = os.path.join(self.plugin_dir, 'icon-mono-configure.svg')
+        self.settings_button.setIcon(QIcon(config_icon_path))
+        self.settings_button.setIconSize(self.settings_button.size())
+        self.settings_button.clicked.connect(self.open_config)
+        header_layout.addWidget(self.settings_button)
+        main_layout.addLayout(header_layout)
+
         # Search label
         self.label = QLabel("Search:")
         search_layout.addWidget(self.label)
@@ -626,6 +674,11 @@ class SearchWidget(QWidget):
                 Qgis.Warning
             )
             
+    def open_config(self):
+        """Open the configuration dialog."""
+        if self.open_config_callback:
+            self.open_config_callback()
+
     def refresh_config(self):
         """Refresh the widget when configuration changes."""
         self.hide_results()
