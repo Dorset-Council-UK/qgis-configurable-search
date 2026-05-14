@@ -23,11 +23,6 @@ class AdvancedSearchPanelDialog(QDialog):
         self.config_manager = config_manager
         self.config = config_manager.get_config()
 
-         # Add info label about project providers
-        self.project_info_label = QLabel("ℹ️ Project providers are loaded from the current QGIS project and cannot be edited here.")
-        self.project_info_label.setStyleSheet("color: #666; font-style: italic; padding: 5px; background-color: #f0f0f0; border-radius: 3px;")
-        self.project_info_label.setWordWrap(True)
-
         self.setup_ui()
         self.load_config()
         
@@ -132,11 +127,7 @@ class AdvancedSearchPanelDialog(QDialog):
         button_layout.addWidget(self.move_down_button)
         
         layout.addLayout(button_layout)
-        
-        # Add info label about project providers
-        layout.addWidget(self.project_info_label)
-        self.project_info_label.hide()  # Initially hidden
-        
+
         widget.setLayout(layout)
         return widget
     
@@ -145,7 +136,6 @@ class AdvancedSearchPanelDialog(QDialog):
         has_selection = bool(self.providers_table.selectionModel().selectedRows())
         self.edit_provider_button.setEnabled(has_selection)
         self.remove_provider_button.setEnabled(has_selection)
-        self.project_info_label.hide()
         
     def create_settings_tab(self):
         """Create the general settings tab."""

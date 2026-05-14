@@ -245,7 +245,8 @@ class AdvancedSearchPanel:
         # Create search widget
         self.search_widget = SearchWidget(
             self.search_engine, self.config_manager, self.iface,
-            open_config_callback=self.show_config_dialog
+            open_config_callback=self.show_config_dialog,
+            plugin_dir=self.plugin_dir
         )
         
         # Create dock widget
@@ -261,12 +262,24 @@ class AdvancedSearchPanel:
         self.iface.addDockWidget(Qt.LeftDockWidgetArea, self.dock_widget)
         
     def toggle_search_panel(self):
-        """Toggle the visibility of the search panel."""
-        if hasattr(self, 'dock_widget') and self.dock_widget:
-            if self.dock_widget.isVisible():
-                self.dock_widget.hide()
-            else:
-                self.dock_widget.show()
+        """Toggle the visibility of the search panel.
+
+        - If the dock is hidden, show it.
+        - If the dock is visible but not the active tab (e.g. docked behind
+          the Layers panel), raise it to the front.
+        - If the dock is visible and already the active tab, hide it.
+        """
+        if not (hasattr(self, 'dock_widget') and self.dock_widget):
+            return
+
+        if not self.dock_widget.isVisible():
+            self.dock_widget.show()
+            self.dock_widget.raise_()
+        elif self.dock_widget.visibleRegion().isEmpty():
+            # Visible but obscured by another tab — bring it to the front
+            self.dock_widget.raise_()
+        else:
+            self.dock_widget.hide()
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
@@ -277,14 +290,12 @@ class AdvancedSearchPanel:
         except Exception:
             pass
         
-        configured_toolbar = self._get_configured_toolbar()
-
         for action in self.actions:
             self.iface.removePluginMenu(
                 self.tr(u'&Advanced Search Panel'),
                 action)
-            if configured_toolbar:
-                configured_toolbar.removeAction(action)
+            if self._toolbar:
+                self._toolbar.removeAction(action)
             else:
                 self.iface.removeToolBarIcon(action)
 
@@ -327,12 +338,13 @@ class AdvancedSearchPanel:
 class SearchWidget(QWidget):
     """Custom search widget for the toolbar with results dropdown."""
 
-    def __init__(self, search_engine, config_manager, iface, open_config_callback=None):
+    def __init__(self, search_engine, config_manager, iface, open_config_callback=None, plugin_dir=None):
         super().__init__()
         self.search_engine = search_engine
         self.config_manager = config_manager
         self.iface = iface
         self.open_config_callback = open_config_callback
+        self.plugin_dir = plugin_dir or ""
         self.current_results = []
         
         # Set size policy for panel (allow expansion)
@@ -360,10 +372,13 @@ class SearchWidget(QWidget):
         panel_title.setStyleSheet("font-weight: bold; font-size: 14px; color: #333; margin-bottom: 5px;")
         header_layout.addWidget(panel_title)
         header_layout.addStretch()
-        self.settings_button = QPushButton("⚙")
+        self.settings_button = QPushButton()
         self.settings_button.setToolTip("Configure Advanced Search")
         self.settings_button.setFixedSize(24, 24)
-        self.settings_button.setStyleSheet("QPushButton { border: none; font-size: 14px; color: #666; } QPushButton:hover { color: #333; }")
+        self.settings_button.setStyleSheet("QPushButton { border: none; } QPushButton:hover { background-color: rgba(0,0,0,20); border-radius: 3px; }")
+        config_icon_path = os.path.join(self.plugin_dir, 'icon-mono-configure.svg')
+        self.settings_button.setIcon(QIcon(config_icon_path))
+        self.settings_button.setIconSize(self.settings_button.size())
         self.settings_button.clicked.connect(self.open_config)
         header_layout.addWidget(self.settings_button)
         main_layout.addLayout(header_layout)
